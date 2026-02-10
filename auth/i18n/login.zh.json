@@ -1,0 +1,42 @@
+{
+  "page": {
+    "title": "Lucky Studio 登录页面"
+  },
+  "brand": {
+    "name": "Lucky Studio",
+    "headline": "欢迎回来",
+    "tagline": "Lucky Studio 是一种模型与数据管理平台，平台已经打通数据与模型生产全链路,致力于为用户提供卓越的体验。",
+    "highlights": [
+      "自适应桌面与移动端布局",
+      "清晰的字段状态与安全风格",
+      "已预留登录请求接口"
+    ],
+    "statLabel": "服务器信息"
+  },
+  "form": {
+    "heading": "登录",
+    "subtitle": "使用你的工作区账号。",
+    "emailLabel": "邮箱",
+    "emailPlaceholder": "name@studio.com",
+    "passwordLabel": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "forgotPassword": "忘记密码",
+    "toggleShow": "显示",
+    "toggleHide": "隐藏",
+    "remember": "保持登录状态",
+    "rememberHint": "仅在可信设备上。",
+    "submit": "登录",
+    "submitLoading": "登录中...",
+    "status": "",
+    "footerPrompt": "还没有 Lucky Studio 账号？",
+    "footerAction": "创建账号"
+  },
+  "messages": {
+    "secondary": "辅助流程尚未接入。",
+    "invalid": "请完成所有必填项。",
+    "simulating": "正在验证密码...",
+    "success": "已收到响应，准备跳转。",
+    "error": "仅返回模拟响应，尚未连接后端。",
+    "exception": "模拟请求失败。"
+  }
+}

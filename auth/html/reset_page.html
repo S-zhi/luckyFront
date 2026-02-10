@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="page.title">Lucky Reset Password</title>
+    <link rel="stylesheet" href="../css/login.css" />
+    <link rel="stylesheet" href="../css/background.css" />
+    <script src="../js/i18n.js" defer></script>
+    <script src="../js/reset.js" defer></script>
+  </head>
+  <body>
+    <div class="breakground-container">
+      <div class="page">
+        <div class="canvas">
+          <main class="card">
+            <section class="brand">
+              <div class="logo" aria-hidden="true">
+                <span class="logo-core"></span>
+              </div>
+              <p class="eyebrow" data-i18n="brand.name">Lucky Studio</p>
+              <h1 data-i18n="brand.headline">Reset your access</h1>
+              <p class="tagline" data-i18n="brand.tagline">
+                Verify your email and set a new password in one guided flow.
+              </p>
+              <ul class="highlights">
+                <li data-i18n="brand.highlights.0">Secure email verification built in</li>
+                <li data-i18n="brand.highlights.1">Three-step reset flow ready for API</li>
+                <li data-i18n="brand.highlights.2">Consistent UI with login experience</li>
+              </ul>
+              <div class="stat">
+                <span class="stat-value" data-i18n="brand.statValue">2 min</span>
+                <span class="stat-label" data-i18n="brand.statLabel">average recovery time</span>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-header">
+                <h2 data-i18n="form.heading">Reset password</h2>
+                <p class="subtitle" data-i18n="form.subtitle">
+                  We'll email you a verification code.
+                </p>
+              </div>
+              <form class="form" data-reset-form>
+                <div class="field">
+                  <label for="reset-email" data-i18n="form.emailLabel">Email</label>
+                  <input
+                    id="reset-email"
+                    name="email"
+                    type="email"
+                    placeholder="name@studio.com"
+                    data-i18n-placeholder="form.emailPlaceholder"
+                    autocomplete="email"
+                    required
+                  />
+                </div>
+                <button class="primary" type="button" data-send-code>
+                  <span class="button-text" data-i18n="form.sendCode">Send code</span>
+                  <span class="button-glow" aria-hidden="true"></span>
+                </button>
+                <div class="field">
+                  <label for="reset-code" data-i18n="form.codeLabel">Verification code</label>
+                  <input
+                    id="reset-code"
+                    name="code"
+                    type="text"
+                    inputmode="numeric"
+                    placeholder="123456"
+                    data-i18n-placeholder="form.codePlaceholder"
+                    autocomplete="one-time-code"
+                    required
+                    disabled
+                  />
+                </div>
+                <div class="field">
+                  <label for="reset-password" data-i18n="form.passwordLabel">New password</label>
+                  <div class="password-wrap">
+                    <input
+                      id="reset-password"
+                      name="password"
+                      type="password"
+                      placeholder="Create a new password"
+                      data-i18n-placeholder="form.passwordPlaceholder"
+                      autocomplete="new-password"
+                      minlength="6"
+                      required
+                      disabled
+                    />
+                    <button
+                      class="toggle"
+                      type="button"
+                      data-toggle-target="reset-password"
+                      aria-pressed="false"
+                      data-i18n="form.toggleShow"
+                    >
+                      Show
+                    </button>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="reset-confirm" data-i18n="form.confirmPasswordLabel">
+                    Confirm new password
+                  </label>
+                  <div class="password-wrap">
+                    <input
+                      id="reset-confirm"
+                      name="confirmPassword"
+                      type="password"
+                      placeholder="Re-enter your new password"
+                      data-i18n-placeholder="form.confirmPasswordPlaceholder"
+                      autocomplete="new-password"
+                      minlength="6"
+                      required
+                      disabled
+                    />
+                    <button
+                      class="toggle"
+                      type="button"
+                      data-toggle-target="reset-confirm"
+                      aria-pressed="false"
+                      data-i18n="form.toggleShow"
+                    >
+                      Show
+                    </button>
+                  </div>
+                </div>
+                <button class="primary" type="submit" data-submit disabled>
+                  <span class="button-text" data-i18n="form.submit">Reset password</span>
+                  <span class="button-glow" aria-hidden="true"></span>
+                </button>
+                <p class="status" data-status data-tone="neutral" data-i18n="form.status">
+                  Enter your email to receive a code.
+                </p>
+              </form>
+              <div class="panel-footer">
+                <span data-i18n="form.footerPrompt">Remembered your password?</span>
+                <a
+                  href="login_page.html"
+                  class="link-button"
+                  data-i18n="form.footerAction"
+                >
+                  Back to sign in
+                </a>
+              </div>
+            </section>
+          </main>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

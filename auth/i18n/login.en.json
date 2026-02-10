@@ -1,0 +1,43 @@
+{
+  "page": {
+    "title": "Lucky Studio Login Page"
+  },
+  "brand": {
+    "name": "Lucky Studio",
+    "headline": "Welcome back",
+    "tagline": "Lucky Studio is a model and data management platform that unifies the entire data and model production pipeline, dedicated to delivering an exceptional experience.",
+    "highlights": [
+      "Adaptive layout for desktop and mobile",
+      "Secure styling with clear field states",
+      "Prepared API hook for login requests"
+    ],
+    "statValue": "42k+",
+    "statLabel": "sessions info"
+  },
+  "form": {
+    "heading": "Sign in",
+    "subtitle": "Use your workspace credentials.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "name@studio.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "forgotPassword": "Forgot password",
+    "toggleShow": "Show",
+    "toggleHide": "Hide",
+    "remember": "Keep me signed in",
+    "rememberHint": "Only on trusted devices.",
+    "submit": "Sign in",
+    "submitLoading": "Signing in...",
+    "status": "Demo only. Backend request is prepared but not connected.",
+    "footerPrompt": "New to Lucky Studio?",
+    "footerAction": "Create an account"
+  },
+  "messages": {
+    "secondary": "Secondary flows are not wired yet.",
+    "invalid": "Please complete all required fields.",
+    "simulating": "Simulating request. Ready to connect the backend.",
+    "success": "Stub response received. Backend can be wired now.",
+    "error": "Stub response only. No backend connected.",
+    "exception": "Unable to simulate the request."
+  }
+}

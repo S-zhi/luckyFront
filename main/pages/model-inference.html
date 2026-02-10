@@ -1,0 +1,101 @@
+<header class="page-header">
+    <h1>模型推理</h1>
+    <p class="subtitle">配置参数并执行模型推理任务</p>
+</header>
+
+<div class="content-body">
+    <div class="grid-layout">
+        <!-- 左列：配置与输入 -->
+        <div class="grid-col left-col">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-sliders"></i> 推理配置</h2>
+                </div>
+                <div class="card-body">
+                    <form class="inference-form">
+                        <div class="form-group">
+                            <label>选择模型版本</label>
+                            <select class="form-control">
+                                <option>yolo_v8_n.pt (v1.0)</option>
+                                <option>bert_base_uncased.onnx (v2.1)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>推理方式</label>
+                            <div class="radio-group">
+                                <label class="radio-label"><input type="radio" name="mode" checked> 单次推理</label>
+                                <label class="radio-label"><input type="radio" name="mode"> 批量推理</label>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>置信度阈值 (Confidence)</label>
+                            <input type="range" class="range-input" min="0" max="1" step="0.1" value="0.5">
+                            <div class="range-value">0.5</div>
+                        </div>
+                        
+                        <div class="form-divider"></div>
+
+                        <div class="form-group">
+                            <label>上传数据集 / 图片</label>
+                            <div class="upload-area small" id="dataset-upload">
+                                <i class="fa-solid fa-file-arrow-up"></i>
+                                <span>点击上传待推理数据</span>
+                            </div>
+                            <!-- 数据集大小警告 -->
+                            <div class="warning-box" style="display:block; margin-top: 10px;">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                                <span>当前文件大小: 25MB (阈值: 50MB) - <span class="text-success">允许上传</span></span>
+                                <!-- 超过阈值时显示：提示使用 SCP -->
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary full-width">
+                                <i class="fa-solid fa-play"></i> 启动推理服务
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右列：结果展示 -->
+        <div class="grid-col right-col">
+            <div class="card result-card">
+                <div class="card-header">
+                    <h2>推理结果展示</h2>
+                    <span class="badge processing">运行中...</span>
+                </div>
+                <div class="card-body result-container">
+                    <!-- 模拟结果 -->
+                    <div class="result-placeholder">
+                        <div class="loader"></div>
+                        <p>正在推理中，请稍候...</p>
+                    </div>
+                    
+                    <!-- 实际结果展示区 (Hidden by default for demo) -->
+                    <div class="inference-output" style="display:none;">
+                        <div class="output-item">
+                            <div class="label">LabelText Output:</div>
+                            <div class="code-block">
+                                {
+                                  "class": "person",
+                                  "confidence": 0.98,
+                                  "bbox": [102, 50, 300, 400]
+                                }
+                            </div>
+                        </div>
+                        
+                        <div class="validation-section">
+                            <div class="section-title">校验结果</div>
+                            <div class="alert info">
+                                <i class="fa-solid fa-shield-halved"></i> 校验服务：结果在预期范围内 (Pass)
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

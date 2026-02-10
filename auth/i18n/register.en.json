@@ -1,0 +1,49 @@
+{
+  "page": {
+    "title": "Lucky Register Page"
+  },
+  "brand": {
+    "name": "Vector Studio",
+    "headline": "Create your workspace",
+    "tagline": "Bring your team together in a focused space. This interface is a frontend mock with a ready-to-wire request hook.",
+    "highlights": [
+      "Guided onboarding for new teams",
+      "Secure field states and form feedback",
+      "Prepared API hook for registration"
+    ],
+    "statValue": "3 min",
+    "statLabel": "average setup time"
+  },
+  "form": {
+    "heading": "Create account",
+    "subtitle": "Set up your workspace credentials.",
+    "fullNameLabel": "Full name",
+    "fullNamePlaceholder": "Ava Chen",
+    "emailLabel": "Work email",
+    "emailPlaceholder": "name@studio.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Create a password",
+    "passwordHint": "Minimum 8 characters.",
+    "confirmPasswordLabel": "Confirm password",
+    "confirmPasswordPlaceholder": "Re-enter your password",
+    "toggleShow": "Show",
+    "toggleHide": "Hide",
+    "marketingOptIn": "Send me product updates",
+    "marketingHint": "No spam, unsubscribe anytime.",
+    "terms": "I agree to the Terms and Privacy Policy",
+    "submit": "Create account",
+    "submitLoading": "Creating account...",
+    "status": "Demo only. Registration request is prepared but not connected.",
+    "footerPrompt": "Already have an account?",
+    "footerAction": "Sign in"
+  },
+  "messages": {
+    "secondary": "Secondary flows are not wired yet.",
+    "invalid": "Please complete all required fields.",
+    "simulating": "Simulating request. Ready to connect the backend.",
+    "success": "Stub response received. Backend can be wired now.",
+    "error": "Stub response only. No backend connected.",
+    "exception": "Unable to simulate the request.",
+    "passwordMismatch": "Passwords do not match."
+  }
+}

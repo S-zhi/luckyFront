@@ -1,0 +1,49 @@
+{
+  "page": {
+    "title": "Lucky 注册页面"
+  },
+  "brand": {
+    "name": "Vector Studio",
+    "headline": "创建你的工作区",
+    "tagline": "将团队聚合在一个专注的空间中。该界面为前端演示，并已预留请求接入点。",
+    "highlights": [
+      "为新团队提供引导式入门",
+      "安全的字段状态与表单反馈",
+      "已预留注册请求接口"
+    ],
+    "statValue": "3 分钟",
+    "statLabel": "平均设置时间"
+  },
+  "form": {
+    "heading": "创建账号",
+    "subtitle": "设置你的工作区凭证。",
+    "fullNameLabel": "姓名",
+    "fullNamePlaceholder": "陈安雅",
+    "emailLabel": "工作邮箱",
+    "emailPlaceholder": "name@studio.com",
+    "passwordLabel": "密码",
+    "passwordPlaceholder": "创建一个密码",
+    "passwordHint": "至少 8 个字符。",
+    "confirmPasswordLabel": "确认密码",
+    "confirmPasswordPlaceholder": "再次输入你的密码",
+    "toggleShow": "显示",
+    "toggleHide": "隐藏",
+    "marketingOptIn": "发送产品更新给我",
+    "marketingHint": "不打扰，随时可取消订阅。",
+    "terms": "我同意条款和隐私政策",
+    "submit": "创建账号",
+    "submitLoading": "创建中...",
+    "status": "仅演示。注册请求已预留但未连接后端。",
+    "footerPrompt": "已经有账号？",
+    "footerAction": "登录"
+  },
+  "messages": {
+    "secondary": "辅助流程尚未接入。",
+    "invalid": "请完成所有必填项。",
+    "simulating": "模拟请求中，后端接口可随时接入。",
+    "success": "已收到模拟响应，可接入后端。",
+    "error": "仅返回模拟响应，尚未连接后端。",
+    "exception": "模拟请求失败。",
+    "passwordMismatch": "两次密码不一致。"
+  }
+}

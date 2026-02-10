@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地 AI 模型管理与推理平台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="glass-background"></div>
+    <div class="app-container">
+        <!-- 左侧导航栏 -->
+        <aside class="sidebar glass-sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-cube"></i>
+                <span>AI Core Platform</span>
+            </div>
+            <nav class="nav-menu">
+                <!-- 模型与数据管理 Group -->
+                <div class="nav-group">
+                    <div class="nav-item has-submenu active">
+                        <i class="fa-solid fa-database"></i>
+                        <span>模型与数据管理</span>
+                        <i class="fa-solid fa-chevron-down arrow"></i>
+                    </div>
+                    <div class="submenu" style="display: block;">
+                        <a href="#" class="nav-item sub-item active" data-page="model-management">
+                            <span>模型管理</span>
+                        </a>
+                        <a href="#" class="nav-item sub-item" data-page="dataset-management">
+                            <span>数据集管理</span>
+                        </a>
+                        <a href="#" class="nav-item sub-item" data-page="training-results">
+                            <span>训练结果管理</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 模型训练与推理 Group -->
+                <div class="nav-group">
+                    <div class="nav-item has-submenu">
+                        <i class="fa-solid fa-brain"></i>
+                        <span>模型训练与推理</span>
+                        <i class="fa-solid fa-chevron-down arrow"></i>
+                    </div>
+                    <div class="submenu" style="display: block;">
+                        <a href="#" class="nav-item sub-item" data-page="model-training">
+                            <span>模型训练</span>
+                        </a>
+                        <a href="#" class="nav-item sub-item" data-page="model-validation">
+                            <span>模型验证</span>
+                        </a>
+                        <a href="#" class="nav-item sub-item" data-page="model-inference">
+                            <span>模型推理</span>
+                        </a>
+                    </div>
+                </div>
+
+                <a href="#" class="nav-item" data-page="coming-soon">
+                    <i class="fa-solid fa-rocket"></i>
+                    敬请期待
+                </a>
+            </nav>
+            <div class="user-info">
+                <div class="avatar">Admin</div>
+                <div class="role">Researcher</div>
+            </div>
+        </aside>
+
+        <!-- 主内容区域 -->
+        <main class="main-content" id="main-content">
+            <!-- Content will be loaded here via JS -->
+            <div class="loader-container">
+                <div class="loader"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const mainContent = document.getElementById('main-content');
+            const navItems = document.querySelectorAll('.nav-item:not(.has-submenu)');
+
+            // Function to load page content
+            async function loadPage(pageName) {
+                try {
+                    // Show loading state (optional)
+                    // mainContent.innerHTML = '<div class="loader-container"><div class="loader"></div></div>';
+                    
+                    const response = await fetch(`pages/${pageName}.html`);
+                    if (!response.ok) throw new Error('Page not found');
+                    const html = await response.text();
+                    
+                    // Fade out old content
+                    mainContent.style.opacity = '0';
+                    
+                    setTimeout(() => {
+                        mainContent.innerHTML = `<section class="page-section active fade-in">${html}</section>`;
+                        mainContent.style.opacity = '1';
+                        // Initialize table features after content load
+                        initTableFeatures();
+                    }, 200);
+
+                } catch (error) {
+                    console.error('Error loading page:', error);
+                    mainContent.innerHTML = `<div class="alert error">Failed to load content: ${error.message}</div>`;
+                }
+            }
+
+            // Table Features Initialization
+            function initTableFeatures() {
+                const table = document.querySelector('.data-table');
+                if (!table) return;
+
+                const tbody = table.querySelector('tbody');
+                const originalRows = Array.from(tbody.querySelectorAll('tr'));
+                let currentRows = [...originalRows]; // Filtered & Sorted rows
+                
+                // State
+                let currentPage = 1;
+                let pageSize = 10;
+                let sortColIndex = -1;
+                let sortAsc = true;
+                let sortType = 'string';
+
+                // DOM Elements
+                const searchInput = document.querySelector('.search-bar input');
+                const pageSizeSelect = document.querySelector('.page-size-select');
+                const totalItemsSpan = document.getElementById('total-items');
+                const paginationControls = document.querySelector('.pagination-controls');
+
+                // 1. Core Logic: Render Table
+                function renderTable() {
+                    // Calculate Pagination
+                    const totalItems = currentRows.length;
+                    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+                    
+                    if (currentPage > totalPages) currentPage = totalPages;
+                    if (currentPage < 1) currentPage = 1;
+
+                    const start = (currentPage - 1) * pageSize;
+                    const end = start + pageSize;
+                    const pageRows = currentRows.slice(start, end);
+
+                    // Clear & Append Rows
+                    tbody.innerHTML = '';
+                    pageRows.forEach(row => tbody.appendChild(row));
+
+                    // Update UI
+                    if (totalItemsSpan) totalItemsSpan.textContent = totalItems;
+                    renderPaginationControls(totalPages);
+                }
+
+                function renderPaginationControls(totalPages) {
+                    if (!paginationControls) return;
+                    paginationControls.innerHTML = '';
+
+                    // Prev Button
+                    const prevBtn = document.createElement('button');
+                    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+                    prevBtn.disabled = currentPage === 1;
+                    prevBtn.addEventListener('click', () => {
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderTable();
+                        }
+                    });
+                    paginationControls.appendChild(prevBtn);
+
+                    // Page Numbers (Simplified: 1..N)
+                    // For better UX, we could implement ellipsis logic (1, 2, ..., 10)
+                    // limiting to max 5 visible buttons for now
+                    let startPage = Math.max(1, currentPage - 2);
+                    let endPage = Math.min(totalPages, startPage + 4);
+                    
+                    if (endPage - startPage < 4) {
+                        startPage = Math.max(1, endPage - 4);
+                    }
+
+                    for (let i = startPage; i <= endPage; i++) {
+                        const btn = document.createElement('button');
+                        btn.textContent = i;
+                        if (i === currentPage) btn.classList.add('active');
+                        btn.addEventListener('click', () => {
+                            currentPage = i;
+                            renderTable();
+                        });
+                        paginationControls.appendChild(btn);
+                    }
+
+                    // Next Button
+                    const nextBtn = document.createElement('button');
+                    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+                    nextBtn.disabled = currentPage === totalPages;
+                    nextBtn.addEventListener('click', () => {
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderTable();
+                        }
+                    });
+                    paginationControls.appendChild(nextBtn);
+                }
+
+                // 2. Search Logic
+                if (searchInput) {
+                    searchInput.addEventListener('input', (e) => {
+                        const term = e.target.value.toLowerCase();
+                        currentRows = originalRows.filter(row => {
+                            return row.textContent.toLowerCase().includes(term);
+                        });
+                        // Re-apply sort if active
+                        if (sortColIndex !== -1) {
+                            sortRows();
+                        }
+                        currentPage = 1;
+                        renderTable();
+                    });
+                }
+
+                // 3. Sort Logic
+                const headers = document.querySelectorAll('.data-table th[data-sort]');
+                headers.forEach((header, index) => {
+                    header.addEventListener('click', () => {
+                        const type = header.getAttribute('data-sort');
+                        const colIndex = Array.from(header.parentNode.children).indexOf(header);
+                        
+                        // Update State
+                        if (sortColIndex === colIndex) {
+                            sortAsc = !sortAsc;
+                        } else {
+                            sortColIndex = colIndex;
+                            sortAsc = true;
+                            sortType = type;
+                        }
+
+                        // Update UI
+                        headers.forEach(h => h.classList.remove('asc', 'desc'));
+                        header.classList.toggle('asc', sortAsc);
+                        header.classList.toggle('desc', !sortAsc);
+
+                        sortRows();
+                        renderTable();
+                    });
+                });
+
+                function sortRows() {
+                    currentRows.sort((a, b) => {
+                        const aCell = a.children[sortColIndex].textContent.trim();
+                        const bCell = b.children[sortColIndex].textContent.trim();
+                        
+                        let valA, valB;
+
+                        if (sortType === 'number') {
+                            valA = parseFloat(aCell.replace(/,/g, '')) || 0;
+                            valB = parseFloat(bCell.replace(/,/g, '')) || 0;
+                        } else if (sortType === 'date') {
+                            valA = new Date(aCell).getTime();
+                            valB = new Date(bCell).getTime();
+                        } else {
+                            valA = aCell.toLowerCase();
+                            valB = bCell.toLowerCase();
+                        }
+
+                        if (valA < valB) return sortAsc ? -1 : 1;
+                        if (valA > valB) return sortAsc ? 1 : -1;
+                        return 0;
+                    });
+                }
+
+                // 4. Page Size Logic
+                if (pageSizeSelect) {
+                    pageSizeSelect.addEventListener('change', (e) => {
+                        pageSize = parseInt(e.target.value);
+                        currentPage = 1;
+                        renderTable();
+                    });
+                }
+
+                // Initial Render
+                renderTable();
+            }
+
+            // Initial Load
+            loadPage('model-management');
+
+            // Handle Navigation
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    // Update Active State
+                    document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                    item.classList.add('active');
+
+                    // Load Content
+                    const page = item.getAttribute('data-page');
+                    if (page) {
+                        loadPage(page);
+                    }
+                });
+            });
+
+            // Toggle Submenu
+            const navGroups = document.querySelectorAll('.nav-group .has-submenu');
+            navGroups.forEach(group => {
+                group.addEventListener('click', () => {
+                    const submenu = group.nextElementSibling;
+                    const arrow = group.querySelector('.arrow');
+                    if (submenu) {
+                        const isVisible = submenu.style.display === 'block';
+                        submenu.style.display = isVisible ? 'none' : 'block';
+                        arrow.style.transform = isVisible ? 'rotate(-90deg)' : 'rotate(0deg)';
+                    }
+                });
+            });
+
+            // Global Event Delegation for Dynamic Content
+            document.addEventListener('click', (e) => {
+                // Handle Action Menu Toggle (Split Button)
+                const toggleBtn = e.target.closest('.action-toggle');
+                
+                if (toggleBtn) {
+                    const wrapper = toggleBtn.closest('.action-wrapper');
+                    
+                    // Close other open menus
+                    document.querySelectorAll('.action-wrapper.expanded').forEach(w => {
+                        if (w !== wrapper) w.classList.remove('expanded');
+                    });
+
+                    // Toggle current menu
+                    if (wrapper) {
+                        wrapper.classList.toggle('expanded');
+                    }
+                    return;
+                }
+
+                // Handle clicks outside to close menus
+                if (!e.target.closest('.action-wrapper')) {
+                    document.querySelectorAll('.action-wrapper.expanded').forEach(w => {
+                        w.classList.remove('expanded');
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

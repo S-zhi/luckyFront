@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="page.title"></title>
+  <link rel="stylesheet" href="../css/login.css" />
+  <link rel="stylesheet" href="../css/logo.css" />
+  <link rel="stylesheet" href="../css/background.css" />
+  
+  <script src="../js/input_view_change.js" defer></script>
+  <script src="../js/logo.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/login.js" defer></script>
+  <script src="../js/machine_info.js" defer></script>
+</head>
+
+<body>
+  <div class="breakground-container">
+  <div class="page">
+    <div class="canvas">
+      <main class="card">
+        <section class="brand">
+          <!-- Lucky Studio Logo -->
+          <button id="lucky-logo" class="button" data-text="Awesome">
+            <span id="Lucky-Studio-actual-text" class="actual-text">&nbsp;LuckyStudio&nbsp;</span>
+            <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">&nbsp;LuckyStudio&nbsp;</span>
+          </button>
+          <!-- Lucky Studio Branding : Lucky Studio-->
+          <p class="eyebrow" data-i18n="brand.name"></p>
+          <h1 data-i18n="brand.headline"></h1>
+          <p class="tagline" data-i18n="brand.tagline"></p>
+          <ul class="highlights">
+            <li data-i18n="brand.highlights.0"></li>
+            <li data-i18n="brand.highlights.1"></li>
+            <li data-i18n="brand.highlights.2"></li>
+          </ul>
+          <div class="stat">
+            <span class="stat-value" id="stat-value"></span>
+            <span class="stat-label" data-i18n="brand.statLabel">
+            </span>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <h2 data-i18n="form.heading"></h2>
+            <p class="subtitle" data-i18n="form.subtitle"></p>
+          </div>
+          <form class="form" data-login-form>
+            <div class="field">
+              <label for="email" data-i18n="form.emailLabel"></label>
+              <input id="email" name="email" type="email" placeholder="name@studio.com"
+                data-i18n-placeholder="form.emailPlaceholder" autocomplete="email" required />
+            </div>
+            <div class="field">
+              <div class="label-row">
+                <label for="password" data-i18n="form.passwordLabel">
+
+                </label>
+                <a href="reset_page.html" class="link-button" data-i18n="form.forgotPassword">
+                  Forgot password
+                </a>
+              </div>
+              <div class="password-wrap">
+                <input id="password" name="password" type="password" placeholder="Enter your password"
+                  data-i18n-placeholder="form.passwordPlaceholder" autocomplete="current-password" minlength="6"
+                  required />
+                <button class="toggle" type="button" data-toggle-target="password" aria-pressed="false"
+                  data-i18n="form.toggleShow">
+                  Show
+                </button>
+              </div>
+            </div>
+            <div class="row">
+              <label class="checkbox">
+                <input id="remember" name="remember" type="checkbox" />
+                <span data-i18n="form.remember"></span>
+              </label>
+              <span class="meta" data-i18n="form.rememberHint">
+
+              </span>
+            </div>
+            <button class="primary" type="submit" data-submit>
+              <span class="button-text" data-i18n="form.submit"></span>
+              <span class="button-glow" aria-hidden="true"></span>
+            </button>
+            <p class="status" hidden data-status data-tone="neutral" data-i18n="form.status">
+
+            </p>
+          </form>
+          <div class="panel-footer">
+            <span data-i18n="form.footerPrompt"></span>
+            <a href="register_page.html" class="link-button" data-i18n="form.footerAction">
+            </a>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  </div>
+</body>
+
+</html>

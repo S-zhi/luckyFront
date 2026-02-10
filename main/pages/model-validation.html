@@ -1,0 +1,112 @@
+<header class="page-header">
+    <h1>模型验证</h1>
+    <p class="subtitle">评估模型在特定数据集上的性能表现</p>
+</header>
+
+<div class="content-body">
+    <div class="grid-layout">
+        <!-- 左列：验证配置 -->
+        <div class="grid-col left-col">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-check-double"></i> 验证配置</h2>
+                </div>
+                <div class="card-body">
+                    <form class="validation-form">
+                        <div class="form-group">
+                            <label>选择待验证模型</label>
+                            <select class="form-control">
+                                <option>yolo_v8_n_trained.pt (v1.2)</option>
+                                <option>resnet50_best.pth</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>验证数据集</label>
+                            <select class="form-control">
+                                <option>coco_val_2017</option>
+                                <option>custom_test_set</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>评估指标 (Metrics)</label>
+                            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                                <label class="radio-label"><input type="checkbox" checked> mAP 0.5</label>
+                                <label class="radio-label"><input type="checkbox" checked> mAP 0.5:0.95</label>
+                                <label class="radio-label"><input type="checkbox" checked> Precision</label>
+                                <label class="radio-label"><input type="checkbox" checked> Recall</label>
+                                <label class="radio-label"><input type="checkbox"> F1 Score</label>
+                            </div>
+                        </div>
+
+                        <div class="form-actions" style="margin-top: 24px;">
+                            <button type="button" class="btn btn-primary full-width">
+                                <i class="fa-solid fa-microscope"></i> 开始验证
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右列：验证报告 -->
+        <div class="grid-col right-col">
+            <div class="card result-card">
+                <div class="card-header">
+                    <h2>验证报告</h2>
+                    <div class="actions">
+                        <button class="btn btn-secondary" style="font-size: 12px;"><i class="fa-solid fa-download"></i> 导出报告</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- 模拟结果展示 -->
+                    <div class="validation-results">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                            <div style="background: rgba(16, 185, 129, 0.1); padding: 16px; border-radius: 12px; text-align: center;">
+                                <div style="font-size: 12px; color: #059669; margin-bottom: 4px;">mAP 0.5</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #059669;">0.924</div>
+                            </div>
+                            <div style="background: rgba(59, 130, 246, 0.1); padding: 16px; border-radius: 12px; text-align: center;">
+                                <div style="font-size: 12px; color: #2563eb; margin-bottom: 4px;">Precision</div>
+                                <div style="font-size: 24px; font-weight: 700; color: #2563eb;">0.887</div>
+                            </div>
+                        </div>
+
+                        <div class="section-title" style="margin-bottom: 12px;">详细指标</div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Class</th>
+                                    <th>Precision</th>
+                                    <th>Recall</th>
+                                    <th>mAP50</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>person</td>
+                                    <td>0.91</td>
+                                    <td>0.89</td>
+                                    <td>0.94</td>
+                                </tr>
+                                <tr>
+                                    <td>car</td>
+                                    <td>0.88</td>
+                                    <td>0.85</td>
+                                    <td>0.90</td>
+                                </tr>
+                                <tr>
+                                    <td>bicycle</td>
+                                    <td>0.82</td>
+                                    <td>0.78</td>
+                                    <td>0.85</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

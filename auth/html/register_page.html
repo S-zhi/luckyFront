@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="page.title">Lucky Register Page</title>
+    <link rel="stylesheet" href="../css/login.css" />
+    <link rel="stylesheet" href="../css/register.css" />
+    <link rel="stylesheet" href="../css/logo.css" />
+    <link rel="stylesheet" href="../css/background.css" />
+    <script src="../js/logo.js"></script>
+    <script src="../js/i18n.js" defer></script>
+    <script src="../js/register.js" defer></script>
+    <script src="../js/i18n.js" defer></script>
+    <script src="../js/login.js" defer></script>
+    <script src="../js/machine_info.js" defer></script>
+  </head>
+  <body>
+    <div class="breakground-container"> 
+    <div class="page">
+      <div class="canvas">
+        <main class="card">
+          <section class="brand">
+              <button id="lucky-logo" class="button" data-text="Awesome">
+            <span id="Lucky-Studio-actual-text" class="actual-text">&nbsp;LuckyStudio&nbsp;</span>
+            <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">&nbsp;LuckyStudio&nbsp;</span>
+          </button>
+            <p class="eyebrow" data-i18n="brand.name">Vector Studio</p>
+            <h1 data-i18n="brand.headline">Create your workspace</h1>
+            <p class="tagline" data-i18n="brand.tagline">
+              Bring your team together in a focused space. This interface is a
+              frontend mock with a ready-to-wire request hook.
+            </p>
+            <ul class="highlights">
+              <li data-i18n="brand.highlights.0">Guided onboarding for new teams</li>
+              <li data-i18n="brand.highlights.1">Secure field states and form feedback</li>
+              <li data-i18n="brand.highlights.2">Prepared API hook for registration</li>
+            </ul>
+            <div class="stat">
+              <span class="stat-value" data-i18n="brand.statValue">3 min</span>
+              <span class="stat-label" data-i18n="brand.statLabel">average setup time</span>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2 data-i18n="form.heading">Create account</h2>
+              <p class="subtitle" data-i18n="form.subtitle">Set up your workspace credentials.</p>
+            </div>
+            <form class="form" data-register-form>
+              <div class="field">
+                <label for="full-name" data-i18n="form.fullNameLabel">Full name</label>
+                <input
+                  id="full-name"
+                  name="fullName"
+                  type="text"
+                  placeholder="Ava Chen"
+                  data-i18n-placeholder="form.fullNamePlaceholder"
+                  autocomplete="name"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="email" data-i18n="form.emailLabel">Work email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="name@studio.com"
+                  data-i18n-placeholder="form.emailPlaceholder"
+                  autocomplete="email"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="password" data-i18n="form.passwordLabel">Password</label>
+                <div class="password-wrap">
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Create a password"
+                    data-i18n-placeholder="form.passwordPlaceholder"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                  />
+                  <button
+                    class="toggle"
+                    type="button"
+                    data-toggle-target="password"
+                    aria-pressed="false"
+                    data-i18n="form.toggleShow"
+                  >
+                    Show
+                  </button>
+                </div>
+                <p class="field-note" data-i18n="form.passwordHint">Minimum 8 characters.</p>
+              </div>
+              <div class="field">
+                <label for="confirm-password" data-i18n="form.confirmPasswordLabel">Confirm password</label>
+                <div class="password-wrap">
+                  <input
+                    id="confirm-password"
+                    name="confirmPassword"
+                    type="password"
+                    placeholder="Re-enter your password"
+                    data-i18n-placeholder="form.confirmPasswordPlaceholder"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                  />
+                  <button
+                    class="toggle"
+                    type="button"
+                    data-toggle-target="confirm-password"
+                    aria-pressed="false"
+                    data-i18n="form.toggleShow"
+                  >
+                    Show
+                  </button>
+                </div>
+              </div>
+              <button class="primary" type="submit" data-submit>
+                <span class="button-text" data-i18n="form.submit">Create account</span>
+                <span class="button-glow" aria-hidden="true"></span>
+              </button>
+              <p class="status" hidden data-status data-tone="neutral" data-i18n="form.status">
+                Demo only. Registration request is prepared but not connected.
+              </p>
+            </form>
+            <div class="panel-footer">
+              <span data-i18n="form.footerPrompt">Already have an account?</span>
+              <a
+                href="login_page.html"
+                class="link-button"
+                type="button"
+                data-secondary-action="signin"
+                data-i18n="form.footerAction"
+              >
+                Sign in
+              </a>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    </div>
+  </body>
+</html>

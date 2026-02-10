@@ -1,0 +1,160 @@
+<header class="page-header">
+    <h1>训练结果管理</h1>
+    <p class="subtitle">查看模型训练历史与性能指标</p>
+</header>
+<div class="content-body">
+    <div class="info-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>查看详细的训练指标与 Comet 日志。支持将最佳产出权重（best.pt）直接同步至远程路径。</span>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fa-solid fa-chart-line"></i> 训练任务记录</h2>
+            <div class="actions" style="display: flex; gap: 12px; align-items: center;">
+                <div class="search-bar">
+                    <input type="text" placeholder="搜索任务...">
+                    <button class="btn btn-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-sort="string">任务ID</th>
+                        <th data-sort="string">模型架构</th>
+                        <th data-sort="string">数据集/版本</th>
+                        <th data-sort="number">Epochs</th>
+                        <th data-sort="string">核心指标 (mAP50/Recall)</th>
+                        <th data-sort="string">状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>#TRN-20231024-01</td>
+                        <td>YOLOv8-S</td>
+                        <td>
+                            <div class="name-cell">
+                                <span>coco_val_2017</span>
+                                <span class="badge secondary sm">V1.0</span>
+                            </div>
+                        </td>
+                        <td>100</td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">mAP: 0.92</span>
+                                <span class="tag">Rec: 0.88</span>
+                            </div>
+                        </td>
+                        <td><span class="badge success">成功</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
+                                    <button class="btn-icon cloud" title="上传产出权重"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+                                    <button class="btn-icon" title="Comet Log" onclick="window.open('https://comet.com/exp/123')"><i class="fa-solid fa-chart-line"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>#TRN-20231024-02</td>
+                        <td>ResNet-50</td>
+                        <td>
+                            <div class="name-cell">
+                                <span>Traffic_Signs_V1</span>
+                                <span class="badge secondary sm">V1.2</span>
+                            </div>
+                        </td>
+                        <td>50</td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">Loss: 0.105</span>
+                            </div>
+                        </td>
+                        <td><span class="badge error">失败</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
+                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>#TRN-20231025-01</td>
+                        <td>YOLOv8-M</td>
+                        <td>
+                            <div class="name-cell">
+                                <span>COCO_Full</span>
+                                <span class="badge secondary sm">V2.0</span>
+                            </div>
+                        </td>
+                        <td>300</td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">mAP: --</span>
+                            </div>
+                        </td>
+                        <td><span class="badge processing">训练中</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
+                                    <button class="btn-icon delete" title="停止任务"><i class="fa-solid fa-stop"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>#TRN-20231025-02</td>
+                        <td>EfficientNet</td>
+                        <td>
+                            <div class="name-cell">
+                                <span>ImageNet_Sub</span>
+                                <span class="badge secondary sm">V1.0</span>
+                            </div>
+                        </td>
+                        <td>20</td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">mAP: 0.65</span>
+                            </div>
+                        </td>
+                        <td><span class="badge warning">已中断</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
+                                    <button class="btn-icon" title="恢复训练"><i class="fa-solid fa-rotate-right"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span>共 <span id="total-items">0</span> 条记录</span>
+                    <div>
+                        每页显示:
+                        <select class="page-size-select">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pagination-controls">
+                    <!-- JS will populate buttons -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

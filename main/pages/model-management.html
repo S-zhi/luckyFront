@@ -1,0 +1,134 @@
+<header class="page-header">
+    <h1>本地模型管理</h1>
+    <p class="subtitle">管理与导入本地 AI 模型文件</p>
+</header>
+
+<div class="content-body">
+    <div class="info-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>支持导入检测、分割、分类等多种任务模型。对接 Lucky Project v1 API，支持权重文件同步至百度网盘。</span>
+    </div>
+    <!-- 模型列表表格 -->
+    <div class="card list-card">
+        <div class="card-header">
+            <h2>已导入模型列表</h2>
+            <div class="actions" style="display: flex; gap: 12px; align-items: center;">
+                <div class="search-bar">
+                    <input type="text" placeholder="搜索模型...">
+                    <button class="btn btn-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
+                </div>
+                <button class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> 导入模型</button>
+                <button class="btn btn-secondary"><i class="fa-solid fa-sync"></i> 刷新</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th data-sort="string">模型名称</th>
+                        <th data-sort="string">算法/框架</th>
+                        <th data-sort="string">类型</th>
+                        <th data-sort="string">大小</th>
+                        <th data-sort="date">导入时间</th>
+                        <th data-sort="string">状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="name-cell">
+                                <span>yolo_v8_n.pt</span>
+                                <span class="badge success sm">Latest</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">YOLOv8</span>
+                                <span class="tag">PyTorch</span>
+                            </div>
+                        </td>
+                        <td>检测 (Detection)</td>
+                        <td>6.5 MB</td>
+                        <td>2023-10-24 10:30</td>
+                        <td><span class="badge success">可用</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon download" title="下载"><i class="fa-solid fa-download"></i></button>
+                                    <button class="btn-icon cloud" title="上传至网盘"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="name-cell">
+                                <span>ResNet50_Traffic</span>
+                                <span class="badge secondary sm">Basic</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">ResNet</span>
+                                <span class="tag">ONNX</span>
+                            </div>
+                        </td>
+                        <td>分类 (Classification)</td>
+                        <td>95.5 MB</td>
+                        <td>2023-10-23 15:45</td>
+                        <td><span class="badge success">可用</span></td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon download" title="下载"><i class="fa-solid fa-download"></i></button>
+                                    <button class="btn-icon cloud" title="上传至网盘"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="name-cell">
+                                <span>unsupported_model.bin</span>
+                                <span class="badge error sm">Unsupported</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="tech-stack">
+                                <span class="tag">Unknown</span>
+                            </div>
+                        </td>
+                        <td>--</td>
+                        <td>--</td>
+                        <td>2023-10-23 15:40</td>
+                        <td><span class="badge error">不支持</span></td>
+                        <td>
+                            <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span>共 <span id="total-items">0</span> 条记录</span>
+                    <div>
+                        每页显示:
+                        <select class="page-size-select">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pagination-controls">
+                    <!-- JS will populate buttons -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
