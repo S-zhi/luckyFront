@@ -8,6 +8,8 @@ git config --global credential.helper:root {
     --error-color: #e35d5b;
     --accent-color: #ff8a3d;
 
+
+    
     --text-main: #1f2528;
     --text-secondary: #4f5b61;
     --text-light: #7a878e;
