@@ -10,125 +10,168 @@
     </div>
     <!-- 模型列表表格 -->
     <div class="card list-card">
-        <div class="card-header">
-            <h2>已导入模型列表</h2>
-            <div class="actions" style="display: flex; gap: 12px; align-items: center;">
-                <div class="search-bar">
-                    <input type="text" placeholder="搜索模型...">
-                    <button class="btn btn-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2>已导入模型列表</h2>
+                <p class="model-subtitle">支持关键字检索、类型/算法筛选、分页与按大小排序，导入模型会实时刷新列表。</p>
+            </div>
+            <div class="actions model-actions">
+                <div class="search-bar model-search-bar">
+                    <input type="text" placeholder="搜索模型..." data-model-search-input>
+                    <button class="btn btn-secondary" data-model-search-btn><i class="fa-solid fa-magnifying-glass"></i></button>
                 </div>
-                <button class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> 导入模型</button>
-                <button class="btn btn-secondary"><i class="fa-solid fa-sync"></i> 刷新</button>
+                <select class="model-filter-select" data-model-filter-task-type aria-label="按类型筛选">
+                    <option value="">全部类型</option>
+                    <option value="detect">detect</option>
+                    <option value="segment">segment</option>
+                    <option value="classify">classify</option>
+                    <option value="pose">pose</option>
+                    <option value="obb">obb</option>
+                </select>
+                <input
+                    type="text"
+                    class="model-filter-input"
+                    placeholder="算法/框架，如 yolo_ultralytics"
+                    data-model-filter-impl-type
+                    aria-label="按算法或框架筛选"
+                >
+                <button class="btn btn-secondary" data-model-filter-reset>
+                    <i class="fa-solid fa-filter"></i>
+                    清空筛选
+                </button>
+                <button class="btn btn-primary" data-model-import-open><i class="fa-solid fa-cloud-arrow-up"></i> 导入模型</button>
+                <button class="btn btn-secondary" data-model-refresh-btn><i class="fa-solid fa-sync"></i> 刷新</button>
             </div>
         </div>
         <div class="card-body">
-            <table class="data-table">
+            <div class="model-message-slot" data-model-message></div>
+            <table class="data-table" data-model-table>
                 <thead>
                     <tr>
-                        <th data-sort="string">模型名称</th>
-                        <th data-sort="string">算法/框架</th>
-                        <th data-sort="string">类型</th>
-                        <th data-sort="string">大小</th>
-                        <th data-sort="date">导入时间</th>
-                        <th data-sort="string">状态</th>
+                        <th>模型名称</th>
+                        <th>算法/框架</th>
+                        <th>类型</th>
+                        <th data-sort="string" data-model-sort="size">大小</th>
+                        <th>导入时间</th>
+                        <th>状态</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>
-                            <div class="name-cell">
-                                <span>yolo_v8_n.pt</span>
-                                <span class="badge success sm">Latest</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">YOLOv8</span>
-                                <span class="tag">PyTorch</span>
-                            </div>
-                        </td>
-                        <td>检测 (Detection)</td>
-                        <td>6.5 MB</td>
-                        <td>2023-10-24 10:30</td>
-                        <td><span class="badge success">可用</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon download" title="下载"><i class="fa-solid fa-download"></i></button>
-                                    <button class="btn-icon cloud" title="上传至网盘"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="name-cell">
-                                <span>ResNet50_Traffic</span>
-                                <span class="badge secondary sm">Basic</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">ResNet</span>
-                                <span class="tag">ONNX</span>
-                            </div>
-                        </td>
-                        <td>分类 (Classification)</td>
-                        <td>95.5 MB</td>
-                        <td>2023-10-23 15:45</td>
-                        <td><span class="badge success">可用</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon download" title="下载"><i class="fa-solid fa-download"></i></button>
-                                    <button class="btn-icon cloud" title="上传至网盘"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="name-cell">
-                                <span>unsupported_model.bin</span>
-                                <span class="badge error sm">Unsupported</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">Unknown</span>
-                            </div>
-                        </td>
-                        <td>--</td>
-                        <td>--</td>
-                        <td>2023-10-23 15:40</td>
-                        <td><span class="badge error">不支持</span></td>
-                        <td>
-                            <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
-                        </td>
+                        <td colspan="7" class="table-state">模型列表加载中...</td>
                     </tr>
                 </tbody>
             </table>
             <div class="pagination-container">
                 <div class="pagination-info">
-                    <span>共 <span id="total-items">0</span> 条记录</span>
+                    <span>共 <span id="total-items" data-model-total-items>0</span> 条记录</span>
                     <div>
                         每页显示:
-                        <select class="page-size-select">
+                        <select class="page-size-select" data-model-page-size>
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
                             <option value="20">20</option>
                         </select>
                     </div>
                 </div>
-                <div class="pagination-controls">
+                <div class="pagination-controls" data-model-pagination>
                     <!-- JS will populate buttons -->
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="modal-overlay" data-model-import-modal hidden>
+    <div class="modal-card model-import-card">
+        <div class="modal-header">
+            <h3>导入模型</h3>
+            <button class="btn-icon" type="button" data-model-import-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p class="modal-subtitle">
+            当前后端地址：
+            <code data-model-api-base>http://localhost:8080/v1</code>
+        </p>
+        <div class="form-divider"></div>
+        <form data-model-import-form>
+            <div
+                class="upload-area small model-upload-dropzone"
+                data-model-file-dropzone
+                role="button"
+                tabindex="0"
+                aria-label="拖拽或点击选择模型文件"
+            >
+                <input
+                    type="file"
+                    data-model-file-input
+                    accept=".pt,.pth,.onnx,.engine,.trt,.bin,.ckpt"
+                    hidden
+                />
+                <i class="fa-solid fa-file-arrow-up"></i>
+                <p>拖拽模型文件到这里，或点击选择文件</p>
+                <span class="hint" data-model-file-hint>
+                    支持拖拽/点选，提交时会先调用文件上传接口，再写入模型元数据。
+                </span>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="model-name">模型名称 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="model-name" name="name" class="form-control" type="text" required />
+                </div>
+                <div class="form-group">
+                    <label for="model-version">版本 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="model-version" name="version" class="form-control" type="text" placeholder="1.0 或 v1.0.0" required />
+                </div>
+                <div class="form-group">
+                    <label for="model-storage-server">存储服务 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <select
+                        id="model-storage-server"
+                        name="storage_server"
+                        class="form-control"
+                        data-storage-server-select
+                        required
+                    >
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="model-impl-type">算法实现 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="model-impl-type" name="impl_type" class="form-control" type="text" placeholder="yolo_ultralytics" required />
+                </div>
+                <div class="form-group">
+                    <label for="model-task-type">任务类型 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <select id="model-task-type" name="task_type" class="form-control" required>
+                        <option value="detect">detect</option>
+                        <option value="segment">segment</option>
+                        <option value="classify">classify</option>
+                        <option value="pose">pose</option>
+                        <option value="obb">obb</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="model-size-mb">模型大小(MB) <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="model-size-mb" name="size_mb" class="form-control" type="number" min="0.01" step="0.01" required />
+                </div>
+                <div class="form-group form-span-2">
+                    <label for="model-path">模型路径 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="model-path" name="model_path" class="form-control" type="text" placeholder="/data/models/example.pt" required />
+                </div>
+                <div class="form-group form-span-2">
+                    <label for="model-description">描述（可选）</label>
+                    <textarea id="model-description" name="description" class="form-control model-textarea" rows="3" placeholder="可填写模型来源、用途等信息"></textarea>
+                </div>
+            </div>
+            <div class="model-import-feedback" data-model-import-feedback hidden></div>
+            <div class="form-actions modal-actions">
+                <button class="btn btn-secondary" type="button" data-model-import-close>取消</button>
+                <button class="btn btn-primary" type="submit" data-model-import-submit>
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    提交导入
+                </button>
+            </div>
+        </form>
     </div>
 </div>

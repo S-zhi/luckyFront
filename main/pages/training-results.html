@@ -2,156 +2,93 @@
     <h1>训练结果管理</h1>
     <p class="subtitle">查看模型训练历史与性能指标</p>
 </header>
+
 <div class="content-body">
     <div class="info-box">
         <i class="fa-solid fa-circle-info"></i>
-        <span>查看详细的训练指标与 Comet 日志。支持将最佳产出权重（best.pt）直接同步至远程路径。</span>
+        <span>已对接 Lucky Project v1 训练结果接口。支持按模型ID、数据集ID和训练状态筛选，支持复制权重路径与打开 Comet 日志。</span>
     </div>
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fa-solid fa-chart-line"></i> 训练任务记录</h2>
-            <div class="actions" style="display: flex; gap: 12px; align-items: center;">
-                <div class="search-bar">
-                    <input type="text" placeholder="搜索任务...">
-                    <button class="btn btn-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
+
+    <div class="card list-card">
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2>训练任务记录</h2>
+                <p class="model-subtitle">数据来源：<code data-training-api-base>http://localhost:8080/v1</code>/training-results</p>
+            </div>
+            <div class="actions model-actions">
+                <div class="search-bar model-search-bar">
+                    <input type="text" placeholder="搜索任务..." data-training-search-input>
+                    <button class="btn btn-secondary" data-training-search-btn><i class="fa-solid fa-magnifying-glass"></i></button>
                 </div>
+                <input
+                    class="model-filter-input"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="模型ID"
+                    data-training-filter-model-id
+                    aria-label="按模型ID筛选"
+                />
+                <input
+                    class="model-filter-input"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="数据集ID"
+                    data-training-filter-dataset-id
+                    aria-label="按数据集ID筛选"
+                />
+                <select class="model-filter-select" data-training-filter-status aria-label="按训练状态筛选">
+                    <option value="">全部状态</option>
+                    <option value="0">待开始</option>
+                    <option value="1">训练中</option>
+                    <option value="2">成功</option>
+                    <option value="3">失败</option>
+                    <option value="4">已中断</option>
+                </select>
+                <button class="btn btn-secondary" data-training-filter-reset>
+                    <i class="fa-solid fa-filter"></i>
+                    清空筛选
+                </button>
+                <button class="btn btn-secondary" data-training-refresh-btn>
+                    <i class="fa-solid fa-sync"></i>
+                    刷新
+                </button>
             </div>
         </div>
         <div class="card-body">
-            <table class="data-table">
+            <div class="model-message-slot" data-training-message></div>
+            <table class="data-table" data-training-table>
                 <thead>
                     <tr>
-                        <th data-sort="string">任务ID</th>
-                        <th data-sort="string">模型架构</th>
-                        <th data-sort="string">数据集/版本</th>
-                        <th data-sort="number">Epochs</th>
-                        <th data-sort="string">核心指标 (mAP50/Recall)</th>
-                        <th data-sort="string">状态</th>
+                        <th>任务ID</th>
+                        <th>模型ID</th>
+                        <th>数据集/版本</th>
+                        <th>核心指标</th>
+                        <th>状态</th>
+                        <th>权重路径</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>#TRN-20231024-01</td>
-                        <td>YOLOv8-S</td>
-                        <td>
-                            <div class="name-cell">
-                                <span>coco_val_2017</span>
-                                <span class="badge secondary sm">V1.0</span>
-                            </div>
-                        </td>
-                        <td>100</td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">mAP: 0.92</span>
-                                <span class="tag">Rec: 0.88</span>
-                            </div>
-                        </td>
-                        <td><span class="badge success">成功</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
-                                    <button class="btn-icon cloud" title="上传产出权重"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-                                    <button class="btn-icon" title="Comet Log" onclick="window.open('https://comet.com/exp/123')"><i class="fa-solid fa-chart-line"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>#TRN-20231024-02</td>
-                        <td>ResNet-50</td>
-                        <td>
-                            <div class="name-cell">
-                                <span>Traffic_Signs_V1</span>
-                                <span class="badge secondary sm">V1.2</span>
-                            </div>
-                        </td>
-                        <td>50</td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">Loss: 0.105</span>
-                            </div>
-                        </td>
-                        <td><span class="badge error">失败</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
-                                    <button class="btn-icon delete" title="删除"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>#TRN-20231025-01</td>
-                        <td>YOLOv8-M</td>
-                        <td>
-                            <div class="name-cell">
-                                <span>COCO_Full</span>
-                                <span class="badge secondary sm">V2.0</span>
-                            </div>
-                        </td>
-                        <td>300</td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">mAP: --</span>
-                            </div>
-                        </td>
-                        <td><span class="badge processing">训练中</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
-                                    <button class="btn-icon delete" title="停止任务"><i class="fa-solid fa-stop"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>#TRN-20231025-02</td>
-                        <td>EfficientNet</td>
-                        <td>
-                            <div class="name-cell">
-                                <span>ImageNet_Sub</span>
-                                <span class="badge secondary sm">V1.0</span>
-                            </div>
-                        </td>
-                        <td>20</td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">mAP: 0.65</span>
-                            </div>
-                        </td>
-                        <td><span class="badge warning">已中断</span></td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="查看日志"><i class="fa-solid fa-file-lines"></i></button>
-                                    <button class="btn-icon" title="恢复训练"><i class="fa-solid fa-rotate-right"></i></button>
-                                </div>
-                            </div>
-                        </td>
+                        <td colspan="7" class="table-state">训练结果加载中...</td>
                     </tr>
                 </tbody>
             </table>
             <div class="pagination-container">
                 <div class="pagination-info">
-                    <span>共 <span id="total-items">0</span> 条记录</span>
+                    <span>共 <span data-training-total-items>0</span> 条记录</span>
                     <div>
                         每页显示:
-                        <select class="page-size-select">
+                        <select class="page-size-select" data-training-page-size>
                             <option value="5">5</option>
                             <option value="10" selected>10</option>
                             <option value="20">20</option>
                         </select>
                     </div>
                 </div>
-                <div class="pagination-controls">
+                <div class="pagination-controls" data-training-pagination>
                     <!-- JS will populate buttons -->
                 </div>
             </div>
