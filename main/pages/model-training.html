@@ -19,12 +19,19 @@
                         </div>
                         
                         <div class="form-group">
-                            <label>基础模型 (Base Model)</label>
-                            <select class="form-control">
-                                <option>yolo_v8_n.pt (Pre-trained)</option>
-                                <option>resnet50.pth</option>
-                                <option>None (Train from scratch)</option>
-                            </select>
+                            <label for="training-base-model">基础模型权重 (Base Model)</label>
+                            <input
+                                id="training-base-model"
+                                type="text"
+                                class="form-control"
+                                list="training-base-model-list"
+                                placeholder="输入模型名称或 ID，例如 yolo26n / 206"
+                                autocomplete="off"
+                                data-training-base-model-input
+                            />
+                            <datalist id="training-base-model-list" data-training-base-model-list></datalist>
+                            <input type="hidden" name="base_model_id" data-training-base-model-id />
+                            <p class="form-hint" data-training-base-model-hint>可输入模型名称或 ID 检索；留空表示从零训练。</p>
                         </div>
 
                         <div class="form-group">

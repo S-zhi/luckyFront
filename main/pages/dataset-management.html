@@ -14,105 +14,52 @@
                 <p class="model-subtitle">支持拖拽或点选上传数据集文件，并提交数据集元数据到后端。</p>
             </div>
                 
-            <div class="actions model-actions">
-                <div class="search-bar model-search-bar">
-                    <input type="text" placeholder="搜索数据集...">
-                    <button class="btn btn-secondary"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <div class="actions model-actions">
+                    <div class="search-bar model-search-bar">
+                        <input type="text" placeholder="搜索数据集..." data-dataset-search-input>
+                        <button class="btn btn-secondary" data-dataset-search-btn><i class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+                    <button class="btn btn-primary" data-dataset-upload-open><i class="fa-solid fa-plus"></i> 上传数据集</button>
+                    <button class="btn btn-secondary" data-dataset-refresh-btn><i class="fa-solid fa-sync"></i> 刷新</button>
                 </div>
-                <button class="btn btn-primary" data-dataset-upload-open><i class="fa-solid fa-plus"></i> 上传数据集</button>
-                <button class="btn btn-secondary"><i class="fa-solid fa-sync"></i> 刷新</button>
             </div>
-        </div>
-        <div class="card-body">
-            <div class="dataset-message-slot" data-dataset-message></div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th data-sort="string">数据集名称</th>
-                        <th data-sort="string">存储/格式</th>
-                        <th data-sort="number">样本数量</th>
-                        <th data-sort="string">大小</th>
-                        <th data-sort="string">状态</th>
-                        <th data-sort="date">上传时间</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <div class="name-cell">
-                                <span>coco_val_2017.zip</span>
-                                <span class="badge success sm">Latest</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">Local</span>
-                                <span class="tag">COCO</span>
-                            </div>
-                        </td>
-                        <td>5,000</td>
-                        <td>1.2 GB</td>
-                        <td><span class="badge success">已标注</span></td>
-                        <td>2023-10-20</td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="属性" data-dataset-action="properties"><i class="fa-solid fa-circle-info"></i></button>
-                                    <button class="btn-icon cloud" title="压缩并上传网盘" data-dataset-action="cloud-sync"><i class="fa-solid fa-file-zipper"></i></button>
-                                    <button class="btn-icon delete" title="删除" data-dataset-action="delete"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <div class="name-cell">
-                                <span>Traffic_Signs_V1</span>
-                                <span class="badge secondary sm">V1.0</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">
-                                <span class="tag">OSS</span>
-                                <span class="tag">YOLO</span>
-                            </div>
-                        </td>
-                        <td>1,200</td>
-                        <td>450 MB</td>
-                        <td><span class="badge processing">标注中</span></td>
-                        <td>2023-10-22</td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button class="btn-icon" title="属性" data-dataset-action="properties"><i class="fa-solid fa-circle-info"></i></button>
-                                    <button class="btn-icon cloud" title="压缩并上传网盘" data-dataset-action="cloud-sync"><i class="fa-solid fa-file-zipper"></i></button>
-                                    <button class="btn-icon delete" title="删除" data-dataset-action="delete"><i class="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="pagination-container">
-                <div class="pagination-info">
-                    <span>共 <span id="total-items">0</span> 条记录</span>
-                    <div>
-                        每页显示:
-                        <select class="page-size-select">
-                            <option value="5">5</option>
-                            <option value="10" selected>10</option>
-                            <option value="20">20</option>
-                        </select>
+            <div class="card-body">
+                <div class="dataset-message-slot" data-dataset-message></div>
+                <table class="data-table" data-dataset-table>
+                    <thead>
+                        <tr>
+                            <th data-sort="string">数据集名称</th>
+                            <th data-sort="string">存储/格式</th>
+                            <th data-sort="number">样本数量</th>
+                            <th data-sort="string" data-dataset-sort="size">大小</th>
+                            <th data-sort="string">状态</th>
+                            <th data-sort="date">上传时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="7" class="table-state">数据集列表加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        <span>共 <span id="total-items" data-dataset-total-items>0</span> 条记录</span>
+                        <div>
+                            每页显示:
+                            <select class="page-size-select" data-dataset-page-size>
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="pagination-controls" data-dataset-pagination>
+                        <!-- JS will populate buttons -->
                     </div>
                 </div>
-                <div class="pagination-controls">
-                    <!-- JS will populate buttons -->
-                </div>
             </div>
-        </div>
     </div>
 </div>
 
@@ -156,7 +103,7 @@
                 </div>
                 <div class="form-group">
                     <label for="dataset-version">版本 <span class="required-mark" aria-hidden="true">*</span></label>
-                    <input id="dataset-version" name="version" class="form-control" type="text" placeholder="v1.0.0" required />
+                    <input id="dataset-version" name="version" class="form-control" type="text" placeholder="1.0" required />
                 </div>
                 <div class="form-group">
                     <label for="dataset-storage-server">存储服务 <span class="required-mark" aria-hidden="true">*</span></label>
@@ -186,7 +133,7 @@
                 </div>
                 <div class="form-group">
                     <label for="dataset-size-mb">数据集大小(MB) <span class="required-mark" aria-hidden="true">*</span></label>
-                    <input id="dataset-size-mb" name="size_mb" class="form-control" type="number" min="0.01" step="0.01" required />
+                    <input id="dataset-size-mb" name="size_mb" class="form-control" type="number" min="0.01" step="0.01" readonly required />
                 </div>
                 <div class="form-group form-span-2">
                     <label for="dataset-path">数据集路径 <span class="required-mark" aria-hidden="true">*</span></label>

@@ -14,11 +14,19 @@
                 <div class="card-body">
                     <form class="inference-form">
                         <div class="form-group">
-                            <label>选择模型版本</label>
-                            <select class="form-control">
-                                <option>yolo_v8_n.pt (v1.0)</option>
-                                <option>bert_base_uncased.onnx (v2.1)</option>
-                            </select>
+                            <label for="inference-model-picker">选择模型版本</label>
+                            <input
+                                id="inference-model-picker"
+                                type="text"
+                                class="form-control"
+                                list="inference-model-list"
+                                placeholder="输入模型名称或 ID，例如 yolo26n / 206"
+                                autocomplete="off"
+                                data-inference-model-input
+                            />
+                            <datalist id="inference-model-list" data-inference-model-list></datalist>
+                            <input type="hidden" name="model_id" data-inference-model-id />
+                            <p class="form-hint" data-inference-model-hint>可输入模型名称或 ID 检索并选中。</p>
                         </div>
                         <div class="form-group">
                             <label>推理方式</label>
