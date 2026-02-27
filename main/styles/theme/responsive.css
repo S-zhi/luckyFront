@@ -1,0 +1,83 @@
+@media (max-width: 1360px) {
+    .app-container {
+        gap: 12px;
+        padding: 12px;
+    }
+
+    .sidebar {
+        width: 262px;
+    }
+
+    .extension-toolbar {
+        width: 312px;
+    }
+
+    .main-content {
+        padding: 24px 22px 44px;
+    }
+}
+
+@media (max-width: 1100px) {
+    body {
+        overflow: auto;
+    }
+
+    .app-container {
+        min-height: 100vh;
+        height: auto;
+        flex-wrap: wrap;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-radius: 20px;
+    }
+
+    .nav-menu {
+        max-height: 320px;
+    }
+
+    .main-content {
+        width: 100%;
+        min-height: 68vh;
+        border-radius: 20px;
+    }
+
+    .extension-toolbar {
+        width: 100%;
+        border-radius: 20px;
+    }
+}
+
+@media (max-width: 760px) {
+    .logo-area {
+        height: 76px;
+        font-size: 18px;
+    }
+
+    .main-content {
+        padding: 18px 14px 34px;
+    }
+
+    .card-body,
+    .card-header {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .model-actions {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .search-bar,
+    .model-search-bar {
+        width: 100%;
+    }
+
+    .search-bar input,
+    .model-search-bar input,
+    .model-filter-input {
+        width: 100%;
+    }
+}

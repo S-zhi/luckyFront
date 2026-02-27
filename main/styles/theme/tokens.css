@@ -1,0 +1,41 @@
+:root {
+    --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --font-display: 'Bricolage Grotesque', 'Noto Sans SC', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+
+    --bg-root: #f4ede1;
+    --bg-wash: #f8f2e8;
+    --bg-ink: #123744;
+    --bg-deep: #0d2933;
+
+    --surface-strong: rgba(255, 253, 248, 0.9);
+    --surface-soft: rgba(255, 249, 241, 0.78);
+    --surface-ghost: rgba(255, 255, 255, 0.6);
+
+    --text-main: #172326;
+    --text-secondary: #3d535b;
+    --text-light: #60727a;
+
+    --line-color: rgba(18, 45, 57, 0.14);
+    --primary-color: #0f7d7a;
+    --primary-hover: #0d6f6c;
+    --secondary-color: #1c4f68;
+    --accent-color: #f36f37;
+    --success-color: #19885b;
+    --warning-color: #c47c12;
+    --error-color: #cb433f;
+
+    --glass-bg: rgba(255, 252, 245, 0.65);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.78);
+    --glass-shadow: 0 28px 45px rgba(18, 37, 43, 0.18);
+    --backdrop-blur: 22px;
+
+    --sidebar-bg: linear-gradient(170deg, rgba(13, 41, 51, 0.95) 0%, rgba(23, 66, 79, 0.9) 52%, rgba(14, 50, 59, 0.92) 100%);
+    --sidebar-active: rgba(243, 111, 55, 0.2);
+
+    --radius-xs: 8px;
+    --radius-sm: 12px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --radius-xl: 28px;
+}
