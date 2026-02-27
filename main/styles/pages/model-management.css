@@ -1,0 +1,9 @@
+body[data-page="model-management"] {
+    --primary-color: #0f766e;
+    --accent-color: #e97921;
+}
+
+body[data-page="model-management"] .model-name-chip-0,
+body[data-page="model-management"] .model-name-chip-4 {
+    box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.16);
+}

@@ -1,40 +1,31 @@
-<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; text-align: center; padding-bottom: 40px;">
-    <!-- Hero Section -->
-    <div style="font-size: 64px; color: var(--primary-color); margin-bottom: 24px; animation: float 6s infinite ease-in-out;">
+<div class="coming-soon-page">
+    <div class="coming-soon-hero-icon">
         <i class="fa-solid fa-rocket"></i>
     </div>
-    <h1 style="font-size: 32px; font-weight: 700; color: var(--text-main); margin-bottom: 16px;">
-        精彩功能，即将上线
-    </h1>
-    <p style="color: var(--text-secondary); max-width: 400px; font-size: 16px; margin-bottom: 40px;">
-        我们正在全力开发更多实用工具与高级特性，敬请期待！
-    </p>
-    
-    <!-- Feature Cards -->
-    <div style="margin-bottom: 60px; display: flex; gap: 16px;">
-        <div class="card" style="padding: 20px; width: 120px; text-align: center; margin-bottom: 0;">
-            <i class="fa-solid fa-cloud" style="font-size: 24px; color: var(--primary-color); margin-bottom: 8px;"></i>
-            <div style="font-size: 12px; font-weight: 500;">云端同步</div>
+    <h1 class="coming-soon-title">精彩功能，即将上线</h1>
+    <p class="coming-soon-subtitle">我们正在全力开发更多实用工具与高级特性，敬请期待。</p>
+
+    <div class="coming-soon-feature-grid">
+        <div class="card coming-soon-feature">
+            <i class="fa-solid fa-cloud"></i>
+            <div>云端同步</div>
         </div>
-        <div class="card" style="padding: 20px; width: 120px; text-align: center; margin-bottom: 0;">
-            <i class="fa-solid fa-robot" style="font-size: 24px; color: var(--accent-color); margin-bottom: 8px;"></i>
-            <div style="font-size: 12px; font-weight: 500;">AutoML</div>
+        <div class="card coming-soon-feature">
+            <i class="fa-solid fa-robot"></i>
+            <div>AutoML</div>
         </div>
-        <div class="card" style="padding: 20px; width: 120px; text-align: center; margin-bottom: 0;">
-            <i class="fa-solid fa-users" style="font-size: 24px; color: var(--warning-color); margin-bottom: 8px;"></i>
-            <div style="font-size: 12px; font-weight: 500;">团队协作</div>
+        <div class="card coming-soon-feature">
+            <i class="fa-solid fa-users"></i>
+            <div>团队协作</div>
         </div>
     </div>
 
-    <!-- Roadmap Section -->
-    <div class="card roadmap-container" style="width: 100%; max-width: 800px; text-align: left;">
+    <div class="card roadmap-container coming-soon-roadmap">
         <div class="card-header">
             <h2><i class="fa-solid fa-map-location-dot"></i> 开发计划 (Roadmap)</h2>
         </div>
         <div class="card-body">
             <div class="roadmap-timeline">
-                
-                <!-- Q4 2023 -->
                 <div class="timeline-item completed">
                     <div class="timeline-marker"><i class="fa-solid fa-check"></i></div>
                     <div class="timeline-content">
@@ -44,21 +35,19 @@
                     </div>
                 </div>
 
-                <!-- Q1 2024 -->
                 <div class="timeline-item active">
                     <div class="timeline-marker"><i class="fa-solid fa-spinner fa-spin"></i></div>
                     <div class="timeline-content">
                         <div class="timeline-date">2024 Q1 (Current)</div>
                         <h3 class="timeline-title">模型训练与验证</h3>
                         <p>支持微调 (Fine-tuning)、多指标验证报告及 TensorBoard 集成。</p>
-                        <ul style="margin-top: 8px; font-size: 12px; color: var(--text-secondary); padding-left: 16px;">
+                        <ul class="coming-soon-roadmap-list">
                             <li>新增 YOLOv8 支持</li>
                             <li>优化批量推理性能</li>
                         </ul>
                     </div>
                 </div>
 
-                <!-- Q2 2024 -->
                 <div class="timeline-item">
                     <div class="timeline-marker"></div>
                     <div class="timeline-content">
@@ -68,7 +57,6 @@
                     </div>
                 </div>
 
-                <!-- Q3 2024 -->
                 <div class="timeline-item">
                     <div class="timeline-marker"></div>
                     <div class="timeline-content">
@@ -77,7 +65,6 @@
                         <p>引入神经架构搜索 (NAS) 与自动化超参数优化。</p>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>

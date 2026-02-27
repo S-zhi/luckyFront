@@ -1,0 +1,8 @@
+body[data-page="model-inference"] {
+    --primary-color: #0b7e7a;
+    --accent-color: #c9872f;
+}
+
+body[data-page="model-inference"] .warning-box {
+    border-color: rgba(201, 135, 47, 0.3);
+}

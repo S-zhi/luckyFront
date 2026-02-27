@@ -1,0 +1,8 @@
+body[data-page="coming-soon"] {
+    --primary-color: #574a9f;
+    --accent-color: #0f766e;
+}
+
+body[data-page="coming-soon"] .coming-soon-hero-icon {
+    color: #574a9f;
+}

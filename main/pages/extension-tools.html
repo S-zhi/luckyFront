@@ -1,0 +1,98 @@
+<header class="page-header">
+    <h1>扩展功能栏</h1>
+    <p class="subtitle">扩展工具中心：查看并管理存储服务状态</p>
+</header>
+
+<div class="content-body">
+    <div class="card list-card">
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2><i class="fa-solid fa-server"></i> 存储服务列表</h2>
+                <p class="model-subtitle">
+                    接口：
+                    <code class="core-server-endpoint-code" data-core-server-endpoint>GET /v1/core-servers</code>
+                </p>
+            </div>
+            <div class="actions model-actions">
+                <select class="model-filter-select" data-core-server-state-filter aria-label="按状态筛选">
+                    <option value="all">全部状态</option>
+                    <option value="active">仅运行中</option>
+                    <option value="inactive">仅已停用</option>
+                    <option value="unknown">仅未知</option>
+                </select>
+                <button class="btn btn-primary" data-core-server-add-open>
+                    <i class="fa-solid fa-plus"></i>
+                    新增存储服务
+                </button>
+                <button class="btn btn-secondary" data-core-server-page-refresh>
+                    <i class="fa-solid fa-rotate"></i>
+                    刷新
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="info-box core-server-summary-box">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                <span data-core-server-summary>正在加载存储服务列表...</span>
+            </div>
+
+            <div class="model-message-slot" data-core-server-message></div>
+
+            <table class="data-table" data-core-server-table>
+                <thead>
+                    <tr>
+                        <th>显示名称</th>
+                        <th>服务标识</th>
+                        <th>地址</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="table-state">存储服务列表加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" data-core-server-modal hidden>
+    <div class="modal-card core-server-modal-card">
+        <div class="modal-header">
+            <h3 data-core-server-modal-title>新增存储服务</h3>
+            <button class="btn-icon" type="button" data-core-server-modal-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p class="modal-subtitle" data-core-server-modal-subtitle>
+            通过 POST /v1/core-servers 添加存储服务
+        </p>
+        <div class="form-divider"></div>
+        <form data-core-server-form>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="core-server-key">服务标识(key) <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="core-server-key" name="key" class="form-control" type="text" placeholder="例如：rtx4090" required />
+                </div>
+                <div class="form-group">
+                    <label for="core-server-ip">IP <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="core-server-ip" name="ip" class="form-control" type="text" placeholder="例如：192.168.1.10" required />
+                </div>
+                <div class="form-group">
+                    <label for="core-server-port">端口 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="core-server-port" name="port" class="form-control" type="number" min="1" max="65535" step="1" placeholder="例如：22" required />
+                </div>
+            </div>
+            <div class="core-server-form-feedback model-import-feedback" data-core-server-form-feedback hidden></div>
+            <div class="form-actions modal-actions">
+                <button class="btn btn-secondary" type="button" data-core-server-modal-close>取消</button>
+                <button class="btn btn-primary" type="submit" data-core-server-form-submit>
+                    <i class="fa-solid fa-check"></i>
+                    提交
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

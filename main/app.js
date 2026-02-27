@@ -39,8 +39,45 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     let storageServerOptionsCache = null;
+    let coreServerRecordsCache = null;
     let modelPickerRowsCache = null;
     let modelPickerRowsLoadingPromise = null;
+    const pageHtmlCache = new Map();
+    const pageModuleCache = new Map();
+    const pageStyleLinkCache = new Map();
+    const pageStyleLoadPromiseCache = new Map();
+    let pageLoadSeq = 0;
+
+    const PAGE_RESOURCE_MANIFEST = {
+        'model-management': {
+            styles: ['styles/pages/model-management.css'],
+        },
+        'dataset-management': {
+            styles: ['styles/pages/dataset-management.css'],
+        },
+        'training-results': {
+            styles: ['styles/pages/training-results.css'],
+            module: './page-modules/training-results.js',
+            exportName: 'initTrainingResultsPage',
+        },
+        'model-training': {
+            styles: ['styles/pages/model-training.css'],
+        },
+        'model-validation': {
+            styles: ['styles/pages/model-validation.css'],
+        },
+        'model-inference': {
+            styles: ['styles/pages/model-inference.css'],
+        },
+        'extension-tools': {
+            styles: ['styles/pages/extension-tools.css'],
+            module: './page-modules/extension-tools.js',
+            exportName: 'initExtensionToolsPage',
+        },
+        'coming-soon': {
+            styles: ['styles/pages/coming-soon.css'],
+        },
+    };
 
     const escapeHtml = (value) => {
         const str = String(value == null ? '' : value);
@@ -141,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const shouldUploadToBaidu = (storageServer) => {
         const value = String(storageServer || '').trim().toLowerCase();
         if (!value) return false;
+        if (value === '百度网盘' || value === 'baidu netdisk') return true;
         if (BAIDU_STORAGE_SERVER_VALUES.has(value)) return true;
         return value.includes('baidu');
     };
@@ -148,6 +186,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalizeStorageServerValue = (value) => {
         const raw = String(value || '').trim().toLowerCase();
         if (!raw) return '';
+        if (
+            raw === '本地存储'
+            || raw === 'local storage'
+            || raw === 'local_storage'
+            || raw === 'local-storage'
+        ) {
+            return 'backend';
+        }
+        if (raw === '百度网盘') return 'baidu_netdisk';
         if (shouldUploadToBaidu(raw)) return 'baidu_netdisk';
         if (raw === 'local' || raw === 'localhost') return 'backend';
         return raw;
@@ -156,6 +203,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRemoteCoreStorageServer = (value) => {
         const normalized = normalizeStorageServerValue(value);
         return Boolean(normalized && normalized !== 'backend' && normalized !== 'baidu_netdisk');
+    };
+
+    const resolveModelUploadRoute = (storageServer, {
+        syncBaiduWhenRemote = false,
+    } = {}) => {
+        const requestRemoteCoreUpload = isRemoteCoreStorageServer(storageServer);
+        const requestBaiduUpload = shouldUploadToBaidu(storageServer)
+            || (requestRemoteCoreUpload && Boolean(syncBaiduWhenRemote));
+        return {
+            requestRemoteCoreUpload,
+            requestBaiduUpload,
+        };
     };
 
     const uniqueStorageServers = (values = []) => {
@@ -240,8 +299,87 @@ document.addEventListener('DOMContentLoaded', () => {
         return normalized || '--';
     };
 
+    const getCoreServerStateInfo = (stateValue) => {
+        const normalized = String(stateValue || '').trim().toLowerCase();
+        if (normalized === 'active') {
+            return { key: 'active', label: '运行中' };
+        }
+        if (normalized === 'inactive') {
+            return { key: 'inactive', label: '已停用' };
+        }
+        return { key: 'unknown', label: '未知' };
+    };
+
+    const normalizeCoreServerRecords = (source) => {
+        if (!Array.isArray(source)) return [];
+
+        const result = [];
+        source.forEach((item) => {
+            if (typeof item === 'string') {
+                const keyText = String(item || '').trim();
+                if (!keyText) return;
+                result.push({
+                    key: normalizeStorageServerValue(keyText) || keyText,
+                    rawKey: keyText,
+                    displayName: formatStorageServerLabel(keyText),
+                    state: 'unknown',
+                    ip: '',
+                    port: '',
+                });
+                return;
+            }
+
+            if (!item || typeof item !== 'object') return;
+
+            const rawKey = String(
+                item.key
+                || item.Key
+                || item.name
+                || item.Name
+                || item.value
+                || item.id
+                || item.ID
+                || '',
+            ).trim();
+            if (!rawKey) return;
+
+            const key = normalizeStorageServerValue(rawKey) || rawKey;
+            const state = getCoreServerStateInfo(item.state || item.State).key;
+            const ipRaw = String(item.ip || item.IP || '').trim();
+            const portRaw = item.port == null
+                ? (item.Port == null ? '' : String(item.Port).trim())
+                : String(item.port).trim();
+
+            result.push({
+                key,
+                rawKey,
+                displayName: formatStorageServerLabel(rawKey),
+                state,
+                ip: /^unknown$/i.test(ipRaw) ? '' : ipRaw,
+                port: /^unknown$/i.test(portRaw) ? '' : portRaw,
+            });
+        });
+
+        const seen = new Set();
+        return result.filter((item) => {
+            if (!item || !item.key) return false;
+            if (seen.has(item.key)) return false;
+            seen.add(item.key);
+            return true;
+        });
+    };
+
     const parseStorageServers = (...sources) => {
         const values = [];
+        const appendCsvText = (text) => {
+            String(text || '')
+                .split(/[,\n，;；]+/g)
+                .map((item) => item.trim())
+                .filter(Boolean)
+                .forEach((item) => {
+                    values.push(item);
+                });
+        };
         const appendSource = (source) => {
             if (Array.isArray(source)) {
                 source.forEach((item) => appendSource(item));
@@ -262,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Ignore JSON parse errors and treat as plain string.
                     }
                 }
-                values.push(text);
+                appendCsvText(text);
                 return;
             }
             values.push(source);
@@ -635,6 +773,35 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             clearTimeout(timer);
         }
+    }
+
+    async function fetchCoreServerRecords({
+        force = false,
+    } = {}) {
+        if (!force && Array.isArray(coreServerRecordsCache)) {
+            return coreServerRecordsCache;
+        }
+
+        const coreServerEndpoint = String(
+            (window.APP_CONFIG && window.APP_CONFIG.CORE_SERVERS_API)
+            || '/core-servers',
+        ).trim();
+        if (!coreServerEndpoint) {
+            coreServerRecordsCache = [];
+            return coreServerRecordsCache;
+        }
+
+        const data = await apiRequest(coreServerEndpoint, { method: 'GET' });
+        const rawList = Array.isArray(data)
+            ? data
+            : (
+                (data && Array.isArray(data.list) && data.list)
+                || (data && Array.isArray(data.options) && data.options)
+                || (data && Array.isArray(data.data) && data.data)
+                || []
+            );
+        coreServerRecordsCache = normalizeCoreServerRecords(rawList);
+        return coreServerRecordsCache;
     }
 
     const parseModelVersionValue = (model) => {
@@ -1047,23 +1214,56 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = [];
         source.forEach((item) => {
             if (typeof item === 'string') {
-                const value = item.trim();
-                if (!value) return;
-                result.push({ value, label: value });
+                const rawValue = item.trim();
+                if (!rawValue) return;
+                const normalizedValue = normalizeStorageServerValue(rawValue) || rawValue;
+                result.push({ value: normalizedValue, label: rawValue });
                 return;
             }
             if (!item || typeof item !== 'object') return;
-            const value = String(item.value || item.id || item.key || item.code || '').trim();
-            if (!value) return;
-            const hasCustomLabel = Boolean(item.label || item.name || item.title);
-            const ip = String(item.ip || '').trim();
-            const port = item.port == null ? '' : String(item.port).trim();
+            const stateText = String(item.state || item.State || '').trim().toLowerCase();
+            if (stateText === 'inactive') return;
+            const rawValue = String(
+                item.value
+                || item.id
+                || item.ID
+                || item.key
+                || item.Key
+                || item.code
+                || item.name
+                || item.Name
+                || '',
+            ).trim();
+            if (!rawValue) return;
+
+            const value = normalizeStorageServerValue(rawValue) || rawValue;
+            const explicitLabel = String(item.label || item.title || '').trim();
+            const fallbackLabel = String(
+                item.name
+                || item.Name
+                || item.key
+                || item.Key
+                || rawValue,
+            ).trim() || rawValue;
+            const ipRaw = String(item.ip || item.IP || '').trim();
+            const portRaw = item.port == null
+                ? (item.Port == null ? '' : String(item.Port).trim())
+                : String(item.port).trim();
+            const ip = /^unknown$/i.test(ipRaw) ? '' : ipRaw;
+            const port = /^unknown$/i.test(portRaw) ? '' : portRaw;
             const addrLabel = ip && port ? `${ip}:${port}` : ip;
-            const isCoreServerItem = Boolean(item.key);
+            const isCoreServerItem = Boolean(
+                item.key
+                || item.Key
+                || item.name
+                || item.Name
+                || item.ip
+                || item.IP,
+            );
             const label = String(
-                hasCustomLabel
-                    ? (item.label || item.name || item.title || value)
-                    : (isCoreServerItem && addrLabel ? `${value}(${addrLabel})` : (addrLabel || value)),
+                explicitLabel
+                    ? explicitLabel
+                    : (isCoreServerItem && addrLabel ? `${fallbackLabel}(${addrLabel})` : fallbackLabel),
             ).trim();
             result.push({ value, label: label || value });
         });
@@ -1076,25 +1276,6 @@ document.addEventListener('DOMContentLoaded', () => {
             unique.push(item);
         });
         return unique;
-    };
-
-    const mergeStorageOptions = (...groups) => {
-        const merged = [];
-        const seen = new Set();
-        groups.forEach((group) => {
-            if (!Array.isArray(group)) return;
-            group.forEach((item) => {
-                if (!item || typeof item !== 'object') return;
-                const value = String(item.value || '').trim();
-                if (!value || seen.has(value)) return;
-                seen.add(value);
-                merged.push({
-                    value,
-                    label: String(item.label || value).trim() || value,
-                });
-            });
-        });
-        return merged;
     };
 
     const getConfiguredStorageOptions = () => {
@@ -1124,9 +1305,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    async function loadStorageServerOptions() {
-        if (storageServerOptionsCache && storageServerOptionsCache.length) {
+    async function loadStorageServerOptions({
+        force = false,
+    } = {}) {
+        if (!force && storageServerOptionsCache && storageServerOptionsCache.length) {
             return storageServerOptionsCache;
+        }
+
+        if (force) {
+            storageServerOptionsCache = null;
         }
 
         const fixed = DEFAULT_STORAGE_SERVER_OPTIONS;
@@ -1140,7 +1327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await apiRequest(coreServerEndpoint, { method: 'GET' });
                 const fromCoreServers = normalizeStorageOptions(data);
                 if (fromCoreServers.length) {
-                    storageServerOptionsCache = mergeStorageOptions(fixed, fromCoreServers);
+                    storageServerOptionsCache = fromCoreServers;
                     return storageServerOptionsCache;
                 }
             } catch (error) {
@@ -1155,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const list = (data && data.list) || (data && data.options) || (data && data.data) || data;
                 const fromApi = normalizeStorageOptions(list);
                 if (fromApi.length) {
-                    storageServerOptionsCache = mergeStorageOptions(fixed, fromApi);
+                    storageServerOptionsCache = fromApi;
                     return storageServerOptionsCache;
                 }
             } catch (error) {
@@ -1165,7 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fromConfig = getConfiguredStorageOptions();
         if (fromConfig) {
-            storageServerOptionsCache = mergeStorageOptions(fixed, fromConfig);
+            storageServerOptionsCache = fromConfig;
             return storageServerOptionsCache;
         }
 
@@ -1173,12 +1360,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return storageServerOptionsCache;
     }
 
-    async function populateStorageServerSelects(root = document) {
+    async function populateStorageServerSelects(root = document, {
+        force = false,
+    } = {}) {
         if (!root || typeof root.querySelectorAll !== 'function') return;
         const selects = root.querySelectorAll('[data-storage-server-select]');
         if (!selects || selects.length === 0) return;
 
-        const options = await loadStorageServerOptions();
+        const options = await loadStorageServerOptions({ force });
         selects.forEach((selectEl) => {
             const currentValue = selectEl.value || '';
             setSelectOptions(selectEl, options, {
@@ -2609,46 +2798,141 @@ document.addEventListener('DOMContentLoaded', () => {
         return dangerConfirmModalRefs;
     }
 
+    const getPageManifest = (pageName) => PAGE_RESOURCE_MANIFEST[pageName] || {};
+
+    const invalidateStorageServerCaches = () => {
+        coreServerRecordsCache = null;
+        storageServerOptionsCache = null;
+    };
+
+    const buildLazyPageContext = () => ({
+        apiBaseUrl,
+        timeoutMs,
+        apiRequest,
+        escapeHtml,
+        clearAlert,
+        showAlert,
+        openPropertyModal,
+        bindModelPicker,
+        fetchCoreServerRecords,
+        getCoreServerStateInfo,
+        formatStorageServerLabel,
+        normalizeStorageServerValue,
+        formatDateTime,
+        ensureDangerConfirmModal,
+        invalidateStorageServerCaches,
+    });
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const loadPageTemplate = async (pageName) => {
+        if (pageHtmlCache.has(pageName)) return pageHtmlCache.get(pageName);
+        const response = await fetch(`pages/${pageName}.html`);
+        if (!response.ok) throw new Error('Page not found');
+        const html = await response.text();
+        pageHtmlCache.set(pageName, html);
+        return html;
+    };
+
+    const ensurePageStyles = async (pageName) => {
+        const manifest = getPageManifest(pageName);
+        const styles = Array.isArray(manifest.styles) ? manifest.styles : [];
+        const activeStyleSet = new Set(styles.map((item) => String(item || '').trim()).filter(Boolean));
+
+        pageStyleLinkCache.forEach((linkEl, href) => {
+            if (!linkEl) return;
+            linkEl.disabled = !activeStyleSet.has(href);
+        });
+
+        await Promise.all(Array.from(activeStyleSet).map((href) => {
+            let linkEl = pageStyleLinkCache.get(href);
+            if (!linkEl) {
+                linkEl = document.createElement('link');
+                linkEl.rel = 'stylesheet';
+                linkEl.href = href;
+                linkEl.setAttribute('data-page-style', href);
+                pageStyleLinkCache.set(href, linkEl);
+                document.head.appendChild(linkEl);
+
+                const stylePromise = new Promise((resolve) => {
+                    linkEl.addEventListener('load', () => resolve(), { once: true });
+                    linkEl.addEventListener('error', () => resolve(), { once: true });
+                });
+                pageStyleLoadPromiseCache.set(href, stylePromise);
+            }
+            linkEl.disabled = false;
+            return pageStyleLoadPromiseCache.get(href) || Promise.resolve();
+        }));
+    };
+
+    const loadPageModule = async (pageName) => {
+        const manifest = getPageManifest(pageName);
+        const modulePath = String(manifest.module || '').trim();
+        if (!modulePath) return null;
+
+        if (pageModuleCache.has(modulePath)) {
+            return pageModuleCache.get(modulePath);
+        }
+
+        const loadedModule = await import(modulePath);
+        pageModuleCache.set(modulePath, loadedModule);
+        return loadedModule;
+    };
+
+    const initPageByName = async (pageName) => {
+        if (pageName === 'model-management') {
+            initModelManagementPage();
+            return;
+        }
+
+        if (pageName === 'dataset-management') {
+            initDatasetManagementPage();
+            return;
+        }
+
+        if (pageName === 'model-training') {
+            initModelTrainingPage();
+            return;
+        }
+
+        if (pageName === 'model-inference') {
+            initModelInferencePage();
+            return;
+        }
+
+        const manifest = getPageManifest(pageName);
+        if (manifest.module) {
+            const pageModule = await loadPageModule(pageName);
+            const exportName = String(manifest.exportName || '').trim();
+            const initFn = pageModule && pageModule[exportName];
+            if (typeof initFn === 'function') {
+                initFn(buildLazyPageContext());
+                return;
+            }
+        }
+
+        initTableFeatures();
+    };
+
     // Function to load page content
     async function loadPage(pageName) {
         try {
-            const response = await fetch(`pages/${pageName}.html`);
-            if (!response.ok) throw new Error('Page not found');
-            const html = await response.text();
+            pageLoadSeq += 1;
+            const seq = pageLoadSeq;
+            document.body.dataset.page = pageName;
+            const [html] = await Promise.all([
+                loadPageTemplate(pageName),
+                ensurePageStyles(pageName),
+            ]);
+            if (seq !== pageLoadSeq) return;
 
             mainContent.style.opacity = '0';
+            await sleep(140);
+            if (seq !== pageLoadSeq) return;
+            mainContent.innerHTML = `<section class="page-section active fade-in">${html}</section>`;
+            mainContent.style.opacity = '1';
 
-            setTimeout(() => {
-                mainContent.innerHTML = `<section class="page-section active fade-in">${html}</section>`;
-                mainContent.style.opacity = '1';
-
-                if (pageName === 'model-management') {
-                    initModelManagementPage();
-                    return;
-                }
-
-                if (pageName === 'dataset-management') {
-                    initDatasetManagementPage();
-                    return;
-                }
-
-                if (pageName === 'training-results') {
-                    initTrainingResultsPage();
-                    return;
-                }
-
-                if (pageName === 'model-training') {
-                    initModelTrainingPage();
-                    return;
-                }
-
-                if (pageName === 'model-inference') {
-                    initModelInferencePage();
-                    return;
-                }
-
-                initTableFeatures();
-            }, 200);
+            await initPageByName(pageName);
         } catch (error) {
             console.error('Error loading page:', error);
             mainContent.innerHTML = `<div class="alert error">Failed to load content: ${escapeHtml(error.message)}</div>`;
@@ -2685,6 +2969,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modelSizeInput = document.querySelector('#model-size-mb');
         const modelPathInput = document.querySelector('#model-path');
         const modelImplTypeInput = document.querySelector('#model-impl-type');
+        const modelSyncBaiduWhenRemoteCheckbox = document.querySelector('#model-sync-baidu-when-remote');
 
         if (apiBaseLabel) {
             apiBaseLabel.textContent = apiBaseUrl;
@@ -2799,53 +3084,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return '';
         };
 
-        const formatModelNameLabel = (label) => {
-            const raw = String(label || '').trim();
-            if (!raw) return '';
-            const normalized = normalizeStorageServerValue(raw);
-            if (normalized === 'backend') return '本地存储';
-            if (normalized === 'baidu_netdisk') return '百度网盘';
-            return raw;
-        };
-
-        const normalizeLabelSource = (value) => {
-            if (Array.isArray(value)) return value;
-            if (typeof value !== 'string') return [];
-            const trimmed = value.trim();
-            if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) return [];
-            try {
-                const parsed = JSON.parse(trimmed);
-                return Array.isArray(parsed) ? parsed : [];
-            } catch (error) {
-                return [];
-            }
-        };
-
         const getModelNameLabels = (model) => {
-            const sources = [
-                model && model.labels,
-                model && model.tags,
-                model && model.label_list,
-                model && model.tag_list,
-                model && model.storage_servers,
-                model && model.storage_server,
-            ];
+            const source = model && model.storage_server;
+            if (!Array.isArray(source)) return [];
             const result = [];
-            sources.forEach((source) => {
-                normalizeLabelSource(source).forEach((item) => {
-                    let text = '';
-                    if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-                        text = String(item).trim();
-                    } else if (item && typeof item === 'object') {
-                        text = String(item.label || item.name || item.value || item.code || '').trim();
-                    }
-                    if (!text) return;
-                    const mapped = formatModelNameLabel(text);
-                    if (!mapped) return;
-                    result.push(mapped);
-                });
-            });
-            return Array.from(new Set(result));
+            for (let i = 0; i < source.length; i += 1) {
+                const text = String(source[i] == null ? '' : source[i]).trim();
+                if (!text) continue;
+                if (result.includes(text)) continue;
+                result.push(text);
+            }
+            return result;
         };
 
         const getLabelColorIndex = (label) => {
@@ -3334,7 +3583,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentServers.push('backend');
                     }
                     const modelPath = String(currentModel.model_path || '').trim();
-                    const allStorageOptions = await loadStorageServerOptions();
+                    const allStorageOptions = await loadStorageServerOptions({ force: true });
                     const currentNormalizedSet = new Set(currentServers.map((value) => normalizeStorageServerValue(value)));
                     const normalizedAllOptions = normalizeStorageOptions(allStorageOptions);
                     const allOptionValues = uniqueStorageServers(normalizedAllOptions.map((item) => item.value));
@@ -3698,7 +3947,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!importModal) return;
             importModal.hidden = false;
             setImportFeedback('');
-            await populateStorageServerSelects(importModal);
+            await populateStorageServerSelects(importModal, { force: true });
             versionSuggestSeq += 1;
             if (modelVersionInput) {
                 modelVersionInput.dataset.autoFilled = '1';
@@ -3850,8 +4099,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let resolvedModelPath = resolvedWeightName;
                 let resolvedSizeMb = sizeMb;
-                const requestBaiduUpload = shouldUploadToBaidu(resolvedStorageServer);
-                const requestRemoteCoreUpload = isRemoteCoreStorageServer(resolvedStorageServer);
+                const syncBaiduWhenRemote = modelSyncBaiduWhenRemoteCheckbox
+                    ? isTruthyFlag(formData.get('sync_baidu_when_remote'))
+                    : false;
+                const { requestBaiduUpload, requestRemoteCoreUpload } = resolveModelUploadRoute(
+                    resolvedStorageServer,
+                    { syncBaiduWhenRemote },
+                );
                 let baiduUploaded = false;
                 let coreUploaded = false;
                 let coreServerKey = '';
@@ -3906,11 +4160,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         payload.storage_servers = uniqueStorageServers([resolvedStorageServer, 'backend']);
                     }
 
-                    const preferredPath = requestBaiduUpload
-                        ? (uploadResult && (uploadResult.baidu_path || uploadResult.saved_path))
-                        : (requestRemoteCoreUpload
-                            ? (uploadResult && (uploadResult.core_remote_path || uploadResult.saved_path))
-                            : (uploadResult && uploadResult.saved_path));
+                    const baiduPath = String(uploadResult && uploadResult.baidu_path || '').trim();
+                    const coreRemotePath = String(uploadResult && uploadResult.core_remote_path || '').trim();
+                    const savedPath = String(uploadResult && uploadResult.saved_path || '').trim();
+                    const preferredPath = requestRemoteCoreUpload
+                        ? (coreRemotePath || savedPath)
+                        : (requestBaiduUpload ? (baiduPath || savedPath) : savedPath);
                     if (preferredPath) {
                         resolvedModelPath = String(preferredPath);
                         payload.model_path = resolvedModelPath;
@@ -3919,14 +4174,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!payload.model_path) {
                         throw new Error('文件上传成功但未返回保存路径(saved_path)');
                     }
-                    if (requestBaiduUpload) {
-                        const baiduPath = uploadResult && uploadResult.baidu_path ? String(uploadResult.baidu_path) : '';
+                    if (requestRemoteCoreUpload && requestBaiduUpload) {
+                        const remoteLabel = String(coreServerKey || resolvedStorageServer || '').trim();
+                        const remoteDetail = coreRemotePath ? `（远端路径：${coreRemotePath}）` : '';
+                        const detail = baiduPath ? `（网盘路径：${baiduPath}）` : '';
+                        setImportFeedback(`文件上传成功，已同步到远程服务器 ${remoteLabel}${remoteDetail}，并同步到百度网盘${detail}，正在创建模型记录...`, 'info');
+                    } else if (requestBaiduUpload) {
                         const detail = baiduPath ? `（网盘路径：${baiduPath}）` : '';
                         setImportFeedback(`文件上传成功，已同步到百度网盘${detail}，正在创建模型记录...`, 'info');
                     } else if (requestRemoteCoreUpload) {
-                        const remotePath = String(uploadResult && uploadResult.core_remote_path || '').trim();
                         const remoteLabel = String(coreServerKey || resolvedStorageServer || '').trim();
-                        const detail = remotePath ? `（远端路径：${remotePath}）` : '';
+                        const detail = coreRemotePath ? `（远端路径：${coreRemotePath}）` : '';
                         setImportFeedback(`文件上传成功，已同步到远程服务器 ${remoteLabel}${detail}，正在创建模型记录...`, 'info');
                     } else {
                         setImportFeedback('文件上传成功，正在创建模型记录...', 'info');
@@ -4477,7 +4735,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!uploadModal) return;
             uploadModal.hidden = false;
             setFeedback('');
-            await populateStorageServerSelects(uploadModal);
+            await populateStorageServerSelects(uploadModal, { force: true });
             datasetVersionSuggestSeq += 1;
             if (datasetVersionInput) {
                 datasetVersionInput.dataset.autoFilled = '1';
@@ -4743,7 +5001,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentServers.push('backend');
                     }
                     const datasetPath = String(currentDataset.dataset_path || '').trim();
-                    const allStorageOptions = await loadStorageServerOptions();
+                    const allStorageOptions = await loadStorageServerOptions({ force: true });
                     const currentNormalizedSet = new Set(currentServers.map((value) => normalizeStorageServerValue(value)));
                     const normalizedAllOptions = normalizeStorageOptions(allStorageOptions);
                     const allOptionValues = uniqueStorageServers(normalizedAllOptions.map((item) => item.value));
@@ -5151,479 +5409,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function initTrainingResultsPage() {
-        const table = document.querySelector('[data-training-table]');
-        if (!table) return;
-
-        const tbody = table.querySelector('tbody');
-        const searchInput = document.querySelector('[data-training-search-input]');
-        const searchBtn = document.querySelector('[data-training-search-btn]');
-        const modelIdInput = document.querySelector('[data-training-filter-model-id]');
-        const datasetIdInput = document.querySelector('[data-training-filter-dataset-id]');
-        const statusSelect = document.querySelector('[data-training-filter-status]');
-        const resetBtn = document.querySelector('[data-training-filter-reset]');
-        const refreshBtn = document.querySelector('[data-training-refresh-btn]');
-        const pageSizeSelect = document.querySelector('[data-training-page-size]');
-        const totalItemsSpan = document.querySelector('[data-training-total-items]');
-        const paginationControls = document.querySelector('[data-training-pagination]');
-        const messageSlot = document.querySelector('[data-training-message]');
-        const apiBaseLabel = document.querySelector('[data-training-api-base]');
-
-        if (apiBaseLabel) {
-            apiBaseLabel.textContent = apiBaseUrl;
-        }
-
-        const state = {
-            page: 1,
-            pageSize: Number(pageSizeSelect && pageSizeSelect.value) || 10,
-            keyword: '',
-            modelId: null,
-            datasetId: null,
-            status: '',
-            total: 0,
-            rows: [],
-            loading: false,
-        };
-        let searchTimer = null;
-
-        const setLoadingState = (loading) => {
-            state.loading = loading;
-            [
-                searchInput,
-                searchBtn,
-                modelIdInput,
-                datasetIdInput,
-                statusSelect,
-                resetBtn,
-                refreshBtn,
-                pageSizeSelect,
-            ].forEach((el) => {
-                if (el) el.disabled = loading;
-            });
-        };
-
-        const renderPlaceholderRow = (message) => {
-            tbody.innerHTML = `<tr><td colspan="7" class="table-state">${escapeHtml(message)}</td></tr>`;
-        };
-
-        const parsePositiveInteger = (raw) => {
-            const num = Number(raw);
-            if (!Number.isInteger(num) || num <= 0) return null;
-            return num;
-        };
-
-        const parseMetricDetail = (metricDetail) => {
-            if (metricDetail && typeof metricDetail === 'object') return metricDetail;
-            if (typeof metricDetail !== 'string') return null;
-            const trimmed = metricDetail.trim();
-            if (!trimmed) return null;
-            try {
-                const parsed = JSON.parse(trimmed);
-                return parsed && typeof parsed === 'object' ? parsed : null;
-            } catch (error) {
-                return null;
-            }
-        };
-
-        const formatMetricValue = (value) => {
-            const num = Number(value);
-            if (Number.isFinite(num)) {
-                const precision = Math.abs(num) >= 1 ? 3 : 4;
-                return num.toFixed(precision).replace(/\.?0+$/, '');
-            }
-            return String(value);
-        };
-
-        const buildMetricTags = (item) => {
-            const detail = parseMetricDetail(item && (item.metric_detail || item.metricDetail || item.metrics));
-            if (!detail) return [];
-            return Object.entries(detail)
-                .filter(([key, val]) => key && val != null && val !== '')
-                .slice(0, 4)
-                .map(([key, val]) => `${key}: ${formatMetricValue(val)}`);
-        };
-
-        const getTrainingStatusMeta = (statusValue) => {
-            const num = Number(statusValue);
-            if (Number.isFinite(num)) {
-                const code = Math.trunc(num);
-                if (code === 0) return { cls: 'warning', text: '待开始' };
-                if (code === 1) return { cls: 'processing', text: '训练中' };
-                if (code === 2) return { cls: 'success', text: '成功' };
-                if (code === 3) return { cls: 'error', text: '失败' };
-                if (code === 4) return { cls: 'warning', text: '已中断' };
-            }
-
-            const normalized = String(statusValue == null ? '' : statusValue).trim().toLowerCase();
-            if (!normalized) return { cls: 'secondary', text: '未知' };
-            if (normalized.includes('success') || normalized.includes('completed') || normalized.includes('成功')) {
-                return { cls: 'success', text: '成功' };
-            }
-            if (normalized.includes('running') || normalized.includes('processing') || normalized.includes('训练中')) {
-                return { cls: 'processing', text: '训练中' };
-            }
-            if (normalized.includes('fail') || normalized.includes('error') || normalized.includes('失败')) {
-                return { cls: 'error', text: '失败' };
-            }
-            if (normalized.includes('interrupt') || normalized.includes('stopped') || normalized.includes('中断')) {
-                return { cls: 'warning', text: '已中断' };
-            }
-            return { cls: 'secondary', text: String(statusValue) };
-        };
-
-        const truncateMiddle = (text, maxLength = 54) => {
-            const str = String(text || '');
-            if (str.length <= maxLength) return str;
-            const keep = Math.max(8, Math.floor((maxLength - 3) / 2));
-            return `${str.slice(0, keep)}...${str.slice(-keep)}`;
-        };
-
-        const renderRows = () => {
-            if (!Array.isArray(state.rows) || state.rows.length === 0) {
-                renderPlaceholderRow('暂无训练结果');
-                return;
-            }
-
-            const html = state.rows.map((item) => {
-                const taskIdRaw = item.id ?? item.training_id ?? item.task_id ?? '--';
-                const modelIdRaw = item.model_id ?? item.training_model_id ?? '--';
-                const datasetIdRaw = item.dataset_id ?? item.training_dataset_id ?? '--';
-                const datasetVersionRaw = item.dataset_version ?? item.dataset_ver ?? '--';
-                const status = getTrainingStatusMeta(item.training_status ?? item.status);
-                const metricTags = buildMetricTags(item);
-                const metricsHtml = metricTags.length
-                    ? metricTags.map((tagText) => `<span class="tag">${escapeHtml(tagText)}</span>`).join('')
-                    : '<span class="tag">--</span>';
-                const weightPath = String(item.weight_path || item.weightPath || '').trim();
-                const weightPathDisplay = weightPath ? escapeHtml(truncateMiddle(weightPath)) : '--';
-                const cometUrl = String(item.comet_log_url || item.comet_url || '').trim();
-                const datasetVersionText = String(datasetVersionRaw == null ? '--' : datasetVersionRaw).trim() || '--';
-                const datasetBadgeText = datasetVersionText === '--'
-                    ? '--'
-                    : (datasetVersionText.toLowerCase().startsWith('v') ? datasetVersionText : `v${datasetVersionText}`);
-                const datasetNameText = datasetIdRaw === '--' ? '--' : `#${datasetIdRaw}`;
-                const encodedWeightPath = encodeURIComponent(weightPath);
-                const encodedCometUrl = encodeURIComponent(cometUrl);
-                const encodedDetail = encodeURIComponent(JSON.stringify(item || {}));
-
-                return `
-                    <tr>
-                        <td>${escapeHtml(String(taskIdRaw))}</td>
-                        <td>${escapeHtml(String(modelIdRaw))}</td>
-                        <td>
-                            <div class="name-cell">
-                                <span>${escapeHtml(String(datasetNameText))}</span>
-                                <span class="badge secondary sm">${escapeHtml(datasetBadgeText)}</span>
-                            </div>
-                        </td>
-                        <td>
-                            <div class="tech-stack">${metricsHtml}</div>
-                        </td>
-                        <td><span class="badge ${status.cls}">${escapeHtml(status.text)}</span></td>
-                        <td title="${escapeHtml(weightPath)}">${weightPathDisplay}</td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle" title="更多操作"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button
-                                        class="btn-icon"
-                                        title="属性"
-                                        data-training-action="properties"
-                                        data-training-detail="${escapeHtml(encodedDetail)}"
-                                    >
-                                        <i class="fa-solid fa-circle-info"></i>
-                                    </button>
-                                    <button
-                                        class="btn-icon download"
-                                        title="复制权重路径"
-                                        data-training-action="copy-weight-path"
-                                        data-training-path="${escapeHtml(encodedWeightPath)}"
-                                    >
-                                        <i class="fa-solid fa-copy"></i>
-                                    </button>
-                                    <button
-                                        class="btn-icon"
-                                        title="${cometUrl ? '打开 Comet 日志' : '无 Comet 日志'}"
-                                        data-training-action="open-comet"
-                                        data-training-comet-url="${escapeHtml(encodedCometUrl)}"
-                                        ${cometUrl ? '' : 'disabled'}
-                                    >
-                                        <i class="fa-solid fa-chart-line"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            tbody.innerHTML = html;
-        };
-
-        const renderPaginationControls = () => {
-            if (!paginationControls) return;
-
-            const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
-            if (state.page > totalPages) {
-                state.page = totalPages;
-            }
-
-            paginationControls.innerHTML = '';
-
-            const prevBtn = document.createElement('button');
-            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
-            prevBtn.disabled = state.page <= 1 || state.loading;
-            prevBtn.addEventListener('click', () => {
-                if (state.page <= 1) return;
-                state.page -= 1;
-                fetchTrainingResults();
-            });
-            paginationControls.appendChild(prevBtn);
-
-            let startPage = Math.max(1, state.page - 2);
-            let endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
-
-            for (let i = startPage; i <= endPage; i += 1) {
-                const btn = document.createElement('button');
-                btn.textContent = String(i);
-                if (i === state.page) btn.classList.add('active');
-                btn.disabled = state.loading;
-                btn.addEventListener('click', () => {
-                    if (state.page === i) return;
-                    state.page = i;
-                    fetchTrainingResults();
-                });
-                paginationControls.appendChild(btn);
-            }
-
-            const nextBtn = document.createElement('button');
-            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
-            nextBtn.disabled = state.page >= totalPages || state.loading;
-            nextBtn.addEventListener('click', () => {
-                if (state.page >= totalPages) return;
-                state.page += 1;
-                fetchTrainingResults();
-            });
-            paginationControls.appendChild(nextBtn);
-        };
-
-        async function fetchTrainingResults() {
-            setLoadingState(true);
-            renderPaginationControls();
-            renderPlaceholderRow('训练结果加载中...');
-            clearAlert(messageSlot);
-
-            try {
-                const query = {
-                    page: state.page,
-                    page_size: state.pageSize,
-                    keyword: state.keyword,
-                };
-                if (state.modelId != null) query.training_model_id = state.modelId;
-                if (state.datasetId != null) query.training_dataset_id = state.datasetId;
-                if (state.status !== '') query.training_status = state.status;
-
-                const data = await apiRequest('/training-results', { query });
-                const list = Array.isArray(data && data.list) ? data.list : [];
-                const total = Number(data && data.total);
-
-                state.rows = list;
-                state.total = Number.isFinite(total) ? total : list.length;
-                renderRows();
-                renderPaginationControls();
-
-                if (totalItemsSpan) {
-                    totalItemsSpan.textContent = String(state.total);
-                }
-            } catch (error) {
-                state.rows = [];
-                state.total = 0;
-                renderPlaceholderRow('训练结果加载失败');
-                renderPaginationControls();
-                if (totalItemsSpan) {
-                    totalItemsSpan.textContent = '0';
-                }
-                showAlert(messageSlot, `加载训练结果失败: ${error.message}`, 'error');
-            } finally {
-                setLoadingState(false);
-                renderPaginationControls();
-            }
-        }
-
-        const applyFilters = () => {
-            const keyword = String(searchInput && searchInput.value || '').trim();
-            const modelIdRaw = String(modelIdInput && modelIdInput.value || '').trim();
-            const datasetIdRaw = String(datasetIdInput && datasetIdInput.value || '').trim();
-            const modelId = modelIdRaw ? parsePositiveInteger(modelIdRaw) : null;
-            const datasetId = datasetIdRaw ? parsePositiveInteger(datasetIdRaw) : null;
-
-            if (modelIdRaw && modelId == null) {
-                showAlert(messageSlot, '模型ID 需为大于 0 的整数。', 'error');
-                return;
-            }
-            if (datasetIdRaw && datasetId == null) {
-                showAlert(messageSlot, '数据集ID 需为大于 0 的整数。', 'error');
-                return;
-            }
-
-            state.keyword = keyword;
-            state.modelId = modelId;
-            state.datasetId = datasetId;
-            state.status = String(statusSelect && statusSelect.value || '').trim();
-            state.page = 1;
-            fetchTrainingResults();
-        };
-
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                clearTimeout(searchTimer);
-                searchTimer = setTimeout(() => {
-                    applyFilters();
-                }, 300);
-            });
-            searchInput.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                applyFilters();
-            });
-        }
-
-        if (searchBtn) {
-            searchBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                applyFilters();
-            });
-        }
-
-        [modelIdInput, datasetIdInput].forEach((inputEl) => {
-            if (!inputEl) return;
-            inputEl.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                applyFilters();
-            });
-            inputEl.addEventListener('change', () => {
-                clearTimeout(searchTimer);
-                searchTimer = setTimeout(() => {
-                    applyFilters();
-                }, 300);
-            });
-        });
-
-        if (statusSelect) {
-            statusSelect.addEventListener('change', () => {
-                clearTimeout(searchTimer);
-                applyFilters();
-            });
-        }
-
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                if (searchInput) searchInput.value = '';
-                if (modelIdInput) modelIdInput.value = '';
-                if (datasetIdInput) datasetIdInput.value = '';
-                if (statusSelect) statusSelect.value = '';
-                clearTimeout(searchTimer);
-                applyFilters();
-            });
-        }
-
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                fetchTrainingResults();
-            });
-        }
-
-        if (pageSizeSelect) {
-            pageSizeSelect.addEventListener('change', (e) => {
-                const next = Number(e.target.value);
-                state.pageSize = Number.isFinite(next) && next > 0 ? next : 10;
-                state.page = 1;
-                fetchTrainingResults();
-            });
-        }
-
-        const decodeDataValue = (value) => {
-            const raw = String(value || '');
-            if (!raw) return '';
-            try {
-                return decodeURIComponent(raw);
-            } catch (error) {
-                return raw;
-            }
-        };
-
-        if (tbody) {
-            tbody.addEventListener('click', async (e) => {
-                const actionBtn = e.target.closest('[data-training-action]');
-                if (!actionBtn) return;
-
-                const wrapper = actionBtn.closest('.action-wrapper');
-                if (wrapper) wrapper.classList.remove('expanded');
-
-                const action = actionBtn.dataset.trainingAction;
-                if (action === 'properties') {
-                    const raw = decodeDataValue(actionBtn.dataset.trainingDetail);
-                    let detail = {};
-                    try {
-                        detail = raw ? JSON.parse(raw) : {};
-                    } catch (error) {
-                        detail = { raw };
-                    }
-                    const titleId = detail && (detail.id ?? detail.training_id ?? detail.task_id);
-                    const title = titleId != null ? `训练结果属性 - #${titleId}` : '训练结果属性';
-                    openPropertyModal(title, detail, {
-                        editAction: {
-                            label: '尝试修改',
-                            handler: async () => {
-                                showAlert(messageSlot, '训练结果记录当前仅提供 POST/GET，后端暂无更新接口，暂不能直接修改。', 'info');
-                            },
-                        },
-                    });
-                    return;
-                }
-
-                if (action === 'copy-weight-path') {
-                    const path = decodeDataValue(actionBtn.dataset.trainingPath);
-                    if (!path) {
-                        showAlert(messageSlot, '当前记录没有可复制的权重路径。', 'error');
-                        return;
-                    }
-                    try {
-                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                            await navigator.clipboard.writeText(path);
-                            showAlert(messageSlot, `权重路径已复制: ${path}`, 'info');
-                        } else {
-                            window.prompt('复制权重路径：', path);
-                            showAlert(messageSlot, '浏览器不支持自动复制，请手动复制路径。', 'info');
-                        }
-                    } catch (error) {
-                        window.prompt('复制权重路径：', path);
-                        showAlert(messageSlot, '复制失败，请手动复制路径。', 'error');
-                    }
-                    return;
-                }
-
-                if (action === 'open-comet') {
-                    const cometUrl = decodeDataValue(actionBtn.dataset.trainingCometUrl);
-                    if (!cometUrl) {
-                        showAlert(messageSlot, '当前记录没有 Comet 日志链接。', 'error');
-                        return;
-                    }
-                    window.open(cometUrl, '_blank', 'noopener,noreferrer');
-                }
-            });
-        }
-
-        fetchTrainingResults();
-    }
-
     // Generic table features for non-model pages
     function initTableFeatures() {
         const table = document.querySelector('.data-table');
@@ -5789,6 +5574,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const page = item.getAttribute('data-page');
             document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active'));
             item.classList.add('active');
+            const parentSubmenu = item.closest('.submenu');
+            if (parentSubmenu) {
+                const groupHeader = parentSubmenu.previousElementSibling;
+                if (groupHeader && groupHeader.classList.contains('has-submenu')) {
+                    groupHeader.classList.add('active');
+                }
+            }
 
             if (page) {
                 loadPage(page);

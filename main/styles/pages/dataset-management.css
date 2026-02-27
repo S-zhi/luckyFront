@@ -1,0 +1,9 @@
+body[data-page="dataset-management"] {
+    --primary-color: #8c6a28;
+    --accent-color: #0f766e;
+}
+
+body[data-page="dataset-management"] .info-box {
+    border-color: rgba(140, 106, 40, 0.22);
+    color: #664b15;
+}

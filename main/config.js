@@ -4,15 +4,10 @@ window.APP_CONFIG = {
     // e.g. localStorage.setItem('LP_API_BASE_URL', 'https://api.example.com/v1')
     API_BASE_URL: "http://localhost:8080/v1",
     API_TIMEOUT_MS: 15000,
-    // Optional: set API path/url to fetch storage server options dynamically.
-    // If set, runtime will try this API first, then fall back to STORAGE_SERVER_OPTIONS.
-    // STORAGE_SERVER_OPTIONS_API: "/storage-servers",
-    STORAGE_SERVER_OPTIONS: [
-        { value: "backend", label: "本地存储 (backend)" },
-        { value: "baidu_netdisk", label: "百度网盘 (baidu_netdisk)" },
-        { value: "oss", label: "对象存储 OSS (oss)" },
-        { value: "s3", label: "对象存储 S3 (s3)" }
-    ],
+    // 存储服务统一从 GET /v1/core-servers 获取（会自动拼接 API_BASE_URL）。
+    CORE_SERVERS_API: "/core-servers",
+    // 可选兜底配置：仅在 core-servers 接口不可用时使用。
+    STORAGE_SERVER_OPTIONS: [],
     // Values in storage_server that should trigger `upload_to_baidu=true`.
     BAIDU_STORAGE_SERVER_VALUES: ["baidu_netdisk"],
     MODEL_UPLOAD_SUBDIR: "web-models",

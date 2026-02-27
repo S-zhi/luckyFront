@@ -1,0 +1,14 @@
+body[data-page="extension-tools"] {
+    --primary-color: #275f8f;
+    --accent-color: #0f766e;
+}
+
+body[data-page="extension-tools"] .extension-server-state.active {
+    background: rgba(39, 95, 143, 0.14);
+    color: #1f4f74;
+    border-color: rgba(39, 95, 143, 0.28);
+}
+
+body[data-page="extension-tools"] .core-server-name {
+    color: #1a4361;
+}

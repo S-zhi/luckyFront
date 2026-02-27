@@ -1,0 +1,10 @@
+body[data-page="training-results"] {
+    --primary-color: #1d5f7f;
+    --accent-color: #0f766e;
+}
+
+body[data-page="training-results"] .tag {
+    background: rgba(29, 95, 127, 0.14);
+    border-color: rgba(29, 95, 127, 0.22);
+    color: #184e67;
+}

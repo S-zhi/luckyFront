@@ -1,0 +1,10 @@
+body[data-page="model-training"] {
+    --primary-color: #7a4b2a;
+    --accent-color: #0f766e;
+}
+
+body[data-page="model-training"] .result-card .badge.processing {
+    background: rgba(122, 75, 42, 0.14);
+    border-color: rgba(122, 75, 42, 0.28);
+    color: #6a3e1f;
+}
