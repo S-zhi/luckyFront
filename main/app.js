@@ -23,17 +23,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const DEFAULT_STORAGE_SERVER_OPTIONS = [
         { value: 'backend', label: '本地存储' },
-        { value: 'baidu_netdisk', label: '百度网盘' },
+        { value: 'baidu_network', label: '百度网盘' },
     ];
 
     const BAIDU_STORAGE_SERVER_VALUES = (() => {
         const configured = window.APP_CONFIG && window.APP_CONFIG.BAIDU_STORAGE_SERVER_VALUES;
-        const source = Array.isArray(configured) ? configured : ['baidu_netdisk'];
+        const source = Array.isArray(configured) ? configured : ['baidu_netdisk', 'baidu_network'];
         const normalized = source
             .map((item) => String(item || '').trim().toLowerCase())
             .filter(Boolean);
         if (!normalized.includes('baidu_netdisk')) {
             normalized.push('baidu_netdisk');
+        }
+        if (!normalized.includes('baidu_network')) {
+            normalized.push('baidu_network');
         }
         return new Set(normalized);
     })();
@@ -1284,6 +1287,29 @@ document.addEventListener('DOMContentLoaded', () => {
         return options.length ? options : null;
     };
 
+    const mergeStorageServerOptions = (...sourceLists) => {
+        const merged = [];
+        const seen = new Set();
+
+        const appendItems = (items) => {
+            if (!Array.isArray(items)) return;
+            items.forEach((item) => {
+                if (!item || typeof item !== 'object') return;
+                const value = String(item.value || '').trim();
+                if (!value) return;
+                const key = value.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                const label = String(item.label || '').trim() || value;
+                merged.push({ value, label });
+            });
+        };
+
+        appendItems(DEFAULT_STORAGE_SERVER_OPTIONS);
+        sourceLists.forEach((items) => appendItems(items));
+        return merged;
+    };
+
     const setSelectOptions = (selectEl, options, {
         placeholder = '请选择',
         selectedValue = '',
@@ -1298,6 +1324,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (safeSelected && options.some((item) => item.value === safeSelected)) {
             selectEl.value = safeSelected;
             return;
+        }
+
+        if (safeSelected) {
+            const normalizedSelected = normalizeStorageServerValue(safeSelected);
+            if (normalizedSelected) {
+                const matched = options.find((item) => (
+                    normalizeStorageServerValue(item.value) === normalizedSelected
+                ));
+                if (matched) {
+                    selectEl.value = matched.value;
+                    return;
+                }
+            }
         }
 
         if (!safeSelected && options.length > 0) {
@@ -1316,7 +1355,6 @@ document.addEventListener('DOMContentLoaded', () => {
             storageServerOptionsCache = null;
         }
 
-        const fixed = DEFAULT_STORAGE_SERVER_OPTIONS;
         const coreServerEndpoint = String(
             (window.APP_CONFIG && window.APP_CONFIG.CORE_SERVERS_API)
             || '/core-servers',
@@ -1327,7 +1365,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await apiRequest(coreServerEndpoint, { method: 'GET' });
                 const fromCoreServers = normalizeStorageOptions(data);
                 if (fromCoreServers.length) {
-                    storageServerOptionsCache = fromCoreServers;
+                    storageServerOptionsCache = mergeStorageServerOptions(fromCoreServers);
                     return storageServerOptionsCache;
                 }
             } catch (error) {
@@ -1342,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const list = (data && data.list) || (data && data.options) || (data && data.data) || data;
                 const fromApi = normalizeStorageOptions(list);
                 if (fromApi.length) {
-                    storageServerOptionsCache = fromApi;
+                    storageServerOptionsCache = mergeStorageServerOptions(fromApi);
                     return storageServerOptionsCache;
                 }
             } catch (error) {
@@ -1352,11 +1390,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fromConfig = getConfiguredStorageOptions();
         if (fromConfig) {
-            storageServerOptionsCache = fromConfig;
+            storageServerOptionsCache = mergeStorageServerOptions(fromConfig);
             return storageServerOptionsCache;
         }
 
-        storageServerOptionsCache = fixed;
+        storageServerOptionsCache = mergeStorageServerOptions();
         return storageServerOptionsCache;
     }
 
@@ -2467,12 +2505,14 @@ document.addEventListener('DOMContentLoaded', () => {
             );
 
             const normalizedPreferred = normalizeStorageServerValue(preferredTarget);
+            const preferredOption = normalizedPreferred
+                ? targetOptions.find((item) => normalizeStorageServerValue(item.value) === normalizedPreferred)
+                : null;
             if (
                 targetSelect
-                && normalizedPreferred
-                && targetOptions.some((item) => normalizeStorageServerValue(item.value) === normalizedPreferred)
+                && preferredOption
             ) {
-                targetSelect.value = normalizedPreferred;
+                targetSelect.value = preferredOption.value;
             } else if (targetSelect && targetOptions.length) {
                 targetSelect.value = targetOptions[0].value;
             }
@@ -2603,13 +2643,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!normalizedServers.length) {
                     normalizedServers.push('backend');
                 }
-                const normalizedAllOptions = normalizeStorageOptions(allStorageOptions);
-                modalAllOptions = normalizedAllOptions.length
-                    ? normalizedAllOptions.map((item) => ({
-                        value: normalizeStorageServerValue(item.value),
-                        label: item.label,
-                    })).filter((item) => item.value)
-                    : DEFAULT_STORAGE_SERVER_OPTIONS;
+                const mergedAllOptions = mergeStorageServerOptions(allStorageOptions);
+                if (mergedAllOptions.length) {
+                    const seenNormalized = new Set();
+                    modalAllOptions = mergedAllOptions.filter((item) => {
+                        const normalizedValue = normalizeStorageServerValue(item.value) || item.value;
+                        if (!normalizedValue) return false;
+                        if (seenNormalized.has(normalizedValue)) return false;
+                        seenNormalized.add(normalizedValue);
+                        return true;
+                    });
+                } else {
+                    modalAllOptions = DEFAULT_STORAGE_SERVER_OPTIONS;
+                }
                 optionLabelMap = new Map();
                 modalAllOptions.forEach((item) => {
                     optionLabelMap.set(normalizeStorageServerValue(item.value), item.label);
@@ -2635,8 +2681,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 setSelectItems(sourceSelect, sourceOptions, sourceOptions.length ? '请选择来源存储' : '暂无来源存储');
                 const sourceCandidate = normalizeStorageServerValue(defaultSourceStorage);
                 if (sourceSelect) {
-                    sourceSelect.value = sourceOptions.some((item) => item.value === sourceCandidate)
-                        ? sourceCandidate
+                    const matchedSourceOption = sourceOptions.find((item) => (
+                        item.value === sourceCandidate
+                        || normalizeStorageServerValue(item.value) === sourceCandidate
+                    ));
+                    sourceSelect.value = matchedSourceOption
+                        ? matchedSourceOption.value
                         : (sourceOptions[0] ? sourceOptions[0].value : '');
                 }
                 const targetOptions = refreshTargetOptions({
@@ -4100,7 +4150,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                let resolvedStorageServer = String(formData.get('storage_server') || '').trim();
+                let resolvedStorageServer = normalizeStorageServerValue(formData.get('storage_server'))
+                    || String(formData.get('storage_server') || '').trim();
                 const requestedStorageServers = uniqueStorageServers([resolvedStorageServer, 'backend']);
                 const resolvedWeightName = stripTrailingHashFromWeightName(String(
                     formData.get('model_path')
@@ -5246,7 +5297,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     datasetSizeInput.value = formatDatasetSizeForInput(sizeMb);
                 }
 
-                let resolvedStorageServer = String(formData.get('storage_server') || '').trim();
+                let resolvedStorageServer = normalizeStorageServerValue(formData.get('storage_server'))
+                    || String(formData.get('storage_server') || '').trim();
                 let resolvedDatasetPath = String(formData.get('dataset_path') || '').trim();
                 let resolvedSizeMb = sizeMb;
                 let resolvedFileName = String(selectedDatasetFile.name || '').trim();
@@ -5302,7 +5354,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (!requestBaiduUpload && uploadResult && uploadResult.storage_server) {
-                        resolvedStorageServer = String(uploadResult.storage_server);
+                        resolvedStorageServer = normalizeStorageServerValue(uploadResult.storage_server)
+                            || String(uploadResult.storage_server || '').trim();
                         payload.storage_server = resolvedStorageServer;
                         if (datasetStorageServerSelect) {
                             datasetStorageServerSelect.value = resolvedStorageServer;
