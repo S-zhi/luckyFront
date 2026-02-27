@@ -3085,8 +3085,23 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const getModelNameLabels = (model) => {
-            const source = model && model.storage_server;
-            if (!Array.isArray(source)) return [];
+            const rawSource = model && model.storage_server;
+            let source = [];
+            if (Array.isArray(rawSource)) {
+                source = rawSource;
+            } else if (typeof rawSource === 'string') {
+                const text = rawSource.trim();
+                if (!text) return [];
+                try {
+                    const parsed = JSON.parse(text);
+                    if (!Array.isArray(parsed)) return [];
+                    source = parsed;
+                } catch (error) {
+                    return [];
+                }
+            } else {
+                return [];
+            }
             const result = [];
             for (let i = 0; i < source.length; i += 1) {
                 const text = String(source[i] == null ? '' : source[i]).trim();
