@@ -1,22 +1,22 @@
 {
   "page": {
-    "title": "Lucky Register Page"
+    "title": "Lucky Studio Create Account"
   },
   "brand": {
-    "name": "Vector Studio",
-    "headline": "Create your workspace",
-    "tagline": "Bring your team together in a focused space. This interface is a frontend mock with a ready-to-wire request hook.",
+    "name": "Lucky Studio",
+    "headline": "Open a new workspace",
+    "tagline": "Create a secure account and step into a quieter control surface for data and model operations.",
     "highlights": [
-      "Guided onboarding for new teams",
-      "Secure field states and form feedback",
-      "Prepared API hook for registration"
+      "Minimal onboarding with clear field states",
+      "Secure account creation for your workspace",
+      "Fast, stable experience on desktop and mobile"
     ],
     "statValue": "3 min",
     "statLabel": "average setup time"
   },
   "form": {
     "heading": "Create account",
-    "subtitle": "Set up your workspace credentials.",
+    "subtitle": "Create your workspace credentials.",
     "fullNameLabel": "Full name",
     "fullNamePlaceholder": "Ava Chen",
     "emailLabel": "Work email",
@@ -33,17 +33,17 @@
     "terms": "I agree to the Terms and Privacy Policy",
     "submit": "Create account",
     "submitLoading": "Creating account...",
-    "status": "Demo only. Registration request is prepared but not connected.",
+    "status": "Fill in your details to create an account.",
     "footerPrompt": "Already have an account?",
     "footerAction": "Sign in"
   },
   "messages": {
-    "secondary": "Secondary flows are not wired yet.",
+    "secondary": "This action is not available yet.",
     "invalid": "Please complete all required fields.",
-    "simulating": "Simulating request. Ready to connect the backend.",
-    "success": "Stub response received. Backend can be wired now.",
-    "error": "Stub response only. No backend connected.",
-    "exception": "Unable to simulate the request.",
+    "simulating": "Creating account...",
+    "success": "Account created successfully.",
+    "error": "Registration failed. Please check the information and try again.",
+    "exception": "Unable to complete registration.",
     "passwordMismatch": "Passwords do not match."
   }
 }

@@ -1,5 +1,13 @@
 initI18n("register");
 
+const DEFAULT_API_BASE_URL = "http://localhost:8080/v1";
+const runtimeBaseUrl = window.localStorage.getItem("LP_API_BASE_URL") || "";
+const configuredBaseUrl =
+  runtimeBaseUrl || (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || "";
+const apiBaseUrl = (configuredBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+const timeoutMs =
+  Number(window.APP_CONFIG && window.APP_CONFIG.API_TIMEOUT_MS) || 15000;
+
 const form = document.querySelector("[data-register-form]");
 const statusEl = document.querySelector("[data-status]");
 const submitButton = document.querySelector("[data-submit]");
@@ -26,18 +34,26 @@ const setLoading = (isLoading) => {
   }
 };
 
-// TODO : Replace with real API integration.
 const requestRegister = async (payload) => {
-  // Placeholder for API integration:
-  // return fetch("/api/register", {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify(payload),
-  // });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
-  return new Promise((resolve) => {
-    setTimeout(() => resolve({ ok: true }), 1000);
-  });
+  try {
+    const response = await fetch(`${apiBaseUrl}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : null;
+
+    return { response, data };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 };
 
 const validatePasswordMatch = () => {
@@ -104,30 +120,36 @@ if (form) {
       fullName: form.fullName.value.trim(),
       email: form.email.value.trim(),
       password: form.password.value,
-      
     };
 
     setLoading(true);
-    setStatus(
-      t("messages.simulating", "Simulating request. Ready to connect the backend."),
-      "info"
-    );
+    setStatus(t("messages.simulating", "Creating account..."), "info");
 
     try {
-      const response = await requestRegister(payload);
-      if (response && response.ok) {
+      const { response, data } = await requestRegister(payload);
+
+      if (response.ok) {
         setStatus(
-          t("messages.success", "Stub response received. Backend can be wired now."),
+          (data && (data.message || data.msg)) ||
+            t("messages.success", "Registration successful."),
           "success"
         );
-      } else {
-        setStatus(
-          t("messages.error", "Stub response only. No backend connected."),
-          "error"
-        );
+        return;
       }
+
+      setStatus(
+        (data && (data.message || data.msg || data.error)) ||
+          t("messages.error", "Registration failed."),
+        "error"
+      );
     } catch (error) {
-      setStatus(t("messages.exception", "Unable to simulate the request."), "error");
+      const isTimeout = error && error.name === "AbortError";
+      setStatus(
+        isTimeout
+          ? "Request timed out. Please try again."
+          : error.message || t("messages.exception", "Unable to complete registration."),
+        "error"
+      );
     } finally {
       setLoading(false);
     }

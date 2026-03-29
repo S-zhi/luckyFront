@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title data-i18n="page.title">Lucky Reset Password</title>
     <link rel="stylesheet" href="../css/login.css" />
+    <link rel="stylesheet" href="../css/logo.css" />
     <link rel="stylesheet" href="../css/background.css" />
     <script src="../js/i18n.js" defer></script>
+    <script src="../js/logo.js" defer></script>
     <script src="../js/reset.js" defer></script>
   </head>
   <body>
@@ -15,18 +17,20 @@
         <div class="canvas">
           <main class="card">
             <section class="brand">
-              <div class="logo" aria-hidden="true">
-                <span class="logo-core"></span>
-              </div>
+              <button id="lucky-logo" class="button" data-text="Awesome">
+                <span id="Lucky-Studio-actual-text" class="actual-text">&nbsp;LuckyStudio&nbsp;</span>
+                <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">&nbsp;LuckyStudio&nbsp;</span>
+              </button>
               <p class="eyebrow" data-i18n="brand.name">Lucky Studio</p>
               <h1 data-i18n="brand.headline">Reset your access</h1>
               <p class="tagline" data-i18n="brand.tagline">
-                Verify your email and set a new password in one guided flow.
+                Verify your email and move through a guided recovery flow with
+                clear next steps.
               </p>
               <ul class="highlights">
                 <li data-i18n="brand.highlights.0">Secure email verification built in</li>
-                <li data-i18n="brand.highlights.1">Three-step reset flow ready for API</li>
-                <li data-i18n="brand.highlights.2">Consistent UI with login experience</li>
+                <li data-i18n="brand.highlights.1">Guided recovery flow with clear stages</li>
+                <li data-i18n="brand.highlights.2">Consistent visual language across auth screens</li>
               </ul>
               <div class="stat">
                 <span class="stat-value" data-i18n="brand.statValue">2 min</span>

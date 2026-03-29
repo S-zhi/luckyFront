@@ -1,22 +1,22 @@
 {
   "page": {
-    "title": "Lucky Reset Password"
+    "title": "Lucky Studio Reset Password"
   },
   "brand": {
     "name": "Lucky Studio",
-    "headline": "Reset your access",
-    "tagline": "Verify your email and set a new password in one guided flow.",
+    "headline": "Recover your access",
+    "tagline": "Verify your email and move through a guided recovery flow with clear next steps.",
     "highlights": [
       "Secure email verification built in",
-      "Three-step reset flow ready for API",
-      "Consistent UI with login experience"
+      "Guided recovery flow with clear stages",
+      "Consistent visual language across auth screens"
     ],
     "statValue": "2 min",
     "statLabel": "average recovery time"
   },
   "form": {
     "heading": "Reset password",
-    "subtitle": "We'll email you a verification code.",
+    "subtitle": "We'll send a verification code to your email.",
     "emailLabel": "Email",
     "emailPlaceholder": "name@studio.com",
     "sendCode": "Send code",
@@ -31,7 +31,7 @@
     "toggleHide": "Hide",
     "submit": "Reset password",
     "submitLoading": "Resetting...",
-    "status": "Enter your email to receive a code.",
+    "status": "Enter your email to receive a verification code.",
     "footerPrompt": "Remembered your password?",
     "footerAction": "Back to sign in"
   },
@@ -39,9 +39,9 @@
     "invalid": "Please complete all required fields.",
     "codeSending": "Sending verification code...",
     "codeSent": "Verification code sent. Check your inbox.",
-    "resetSimulating": "Simulating reset request.",
-    "resetSuccess": "Password reset simulated. You can sign in now.",
-    "resetError": "Reset failed in demo mode.",
+    "resetSimulating": "Submitting recovery request...",
+    "resetSuccess": "Password reset complete. You can sign in now.",
+    "resetError": "Password reset failed. Please try again.",
     "resetException": "Unable to reset password.",
     "passwordMismatch": "Passwords do not match."
   }

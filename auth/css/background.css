@@ -1,86 +1,104 @@
 .breakground-container {
-  width: 100%;
   position: relative;
+  width: 100%;
+  min-height: 100vh;
   overflow: hidden;
-  /* control ize */
-  --u: 20px; 
-  --c1: #15c380;
-  --c2: #000000;
-  --c3: #1e1e1e;
-  --gp: 50% / calc(var(--u) * 16.9) calc(var(--u) * 12.8);
-  background: conic-gradient(
-        from 122deg at 50% 85.15%,
-        var(--c2) 0 58deg,
-        var(--c3) 0 116deg,
-        #fff0 0 100%
-      )
-      var(--gp),
-    conic-gradient(from 122deg at 50% 72.5%, var(--c1) 0 116deg, #fff0 0 100%)
-      var(--gp),
-    conic-gradient(from 58deg at 82.85% 50%, var(--c3) 0 64deg, #fff0 0 100%)
-      var(--gp),
-    conic-gradient(
-        from 58deg at 66.87% 50%,
-        var(--c1) 0 64deg,
-        var(--c2) 0 130deg,
-        #fff0 0 100%
-      )
-      var(--gp),
-    conic-gradient(from 238deg at 17.15% 50%, var(--c2) 0 64deg, #fff0 0 100%)
-      var(--gp),
-    conic-gradient(
-        from 172deg at 33.13% 50%,
-        var(--c3) 0 66deg,
-        var(--c1) 0 130deg,
-        #fff0 0 100%
-      )
-      var(--gp),
-    linear-gradient(98deg, var(--c3) 0 15%, #fff0 calc(15% + 1px) 100%)
-      var(--gp),
-    linear-gradient(-98deg, var(--c2) 0 15%, #fff0 calc(15% + 1px) 100%)
-      var(--gp),
-    conic-gradient(
-        from -58deg at 50.25% 14.85%,
-        var(--c3) 0 58deg,
-        var(--c2) 0 116deg,
-        #fff0 0 100%
-      )
-      var(--gp),
-    conic-gradient(from -58deg at 50% 28.125%, var(--c1) 0 116deg, #fff0 0 100%)
-      var(--gp),
-    linear-gradient(90deg, var(--c2) 0 50%, var(--c3) 0 100%) var(--gp);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(216, 255, 99, 0.12), transparent 22%),
+    radial-gradient(circle at 82% 12%, rgba(127, 230, 255, 0.1), transparent 20%),
+    radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(135deg, #030303 0%, #060608 52%, #0b0b0f 100%);
 }
 
+.breakground-container::before {
+  content: "";
+  position: absolute;
+  inset: auto -15% -34% -15%;
+  height: 72vh;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 42px 42px;
+  transform: perspective(1200px) rotateX(78deg);
+  transform-origin: center top;
+  opacity: 0.38;
+  mask-image: linear-gradient(180deg, black 8%, transparent 92%);
+}
+
+.breakground-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 40% 26%, rgba(255, 255, 255, 0.05), transparent 28%),
+    radial-gradient(circle at 65% 62%, rgba(255, 255, 255, 0.04), transparent 22%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: screen;
+  opacity: 0.18;
+}
 
 .canvas {
   position: relative;
-  width: min(1100px, 100%);
+  width: min(1160px, 100%);
 }
 
 .canvas::before,
 .canvas::after {
   content: "";
   position: absolute;
-  border-radius: 999px;
-  filter: blur(0);
-  opacity: 0.75;
-  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
 }
 
 .canvas::before {
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle at 30% 30%, #fff7ec, #f6caa2 60%, #f3ab94);
+  width: 360px;
+  height: 360px;
   top: -80px;
-  left: -80px;
-  animation: float 12s ease-in-out infinite;
+  right: -90px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 24px rgba(255, 255, 255, 0.015),
+    0 0 0 48px rgba(255, 255, 255, 0.01);
+  opacity: 0.66;
+  animation: orbitPulse 18s ease-in-out infinite;
 }
 
 .canvas::after {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle at 70% 30%, #f7f2e7, #f6caa2 60%, #e58c7e);
-  bottom: -90px;
-  right: -60px;
-  animation: float 14s ease-in-out infinite reverse;
+  width: 520px;
+  height: 520px;
+  left: -180px;
+  bottom: -200px;
+  background: radial-gradient(circle, rgba(216, 255, 99, 0.16) 0%, rgba(216, 255, 99, 0.05) 34%, transparent 70%);
+  filter: blur(26px);
+  opacity: 0.9;
+  animation: auraFloat 16s ease-in-out infinite;
+}
+
+@keyframes auraFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(24px, -18px, 0) scale(1.04);
+  }
+}
+
+@keyframes orbitPulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.62;
+  }
+  50% {
+    transform: scale(1.06) rotate(8deg);
+    opacity: 0.88;
+  }
 }

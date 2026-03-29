@@ -1,22 +1,22 @@
 {
   "page": {
-    "title": "Lucky 重置密码"
+    "title": "Lucky Studio 重置密码"
   },
   "brand": {
     "name": "Lucky Studio",
     "headline": "找回你的访问权限",
-    "tagline": "验证邮箱并设置新密码，整个流程一次完成。",
+    "tagline": "验证邮箱后，沿着清晰的步骤完成恢复流程。",
     "highlights": [
-      "已内置安全的邮箱验证",
-      "三步重置流程，接口已预留",
-      "与登录体验保持一致"
+      "内置安全的邮箱验证码流程",
+      "分阶段的恢复流程，步骤清晰",
+      "与登录注册页保持统一视觉语言"
     ],
     "statValue": "2 分钟",
     "statLabel": "平均恢复时间"
   },
   "form": {
     "heading": "重置密码",
-    "subtitle": "我们将发送验证码到你的邮箱。",
+    "subtitle": "我们会向你的邮箱发送验证码。",
     "emailLabel": "邮箱",
     "emailPlaceholder": "name@studio.com",
     "sendCode": "发送验证码",
@@ -36,13 +36,13 @@
     "footerAction": "返回登录"
   },
   "messages": {
-    "invalid": "请完成所有必填项。",
+    "invalid": "请填写所有必填项。",
     "codeSending": "正在发送验证码...",
-    "codeSent": "验证码已发送，请查收邮箱。",
-    "resetSimulating": "模拟重置请求中。",
-    "resetSuccess": "已模拟重置密码，可以登录。",
-    "resetError": "演示模式下重置失败。",
-    "resetException": "无法完成重置。",
-    "passwordMismatch": "两次密码不一致。"
+    "codeSent": "验证码已发送，请检查邮箱。",
+    "resetSimulating": "正在提交恢复请求...",
+    "resetSuccess": "密码已重置，现在可以登录。",
+    "resetError": "重置失败，请稍后再试。",
+    "resetException": "暂时无法完成重置。",
+    "passwordMismatch": "两次输入的密码不一致。"
   }
 }

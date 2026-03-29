@@ -1,24 +1,24 @@
 {
   "page": {
-    "title": "Lucky 注册页面"
+    "title": "Lucky Studio 注册"
   },
   "brand": {
-    "name": "Vector Studio",
-    "headline": "创建你的工作区",
-    "tagline": "将团队聚合在一个专注的空间中。该界面为前端演示，并已预留请求接入点。",
+    "name": "Lucky Studio",
+    "headline": "开启新的工作空间",
+    "tagline": "创建安全账号，进入更安静、更聚焦的数据与模型工作界面。",
     "highlights": [
-      "为新团队提供引导式入门",
-      "安全的字段状态与表单反馈",
-      "已预留注册请求接口"
+      "极简注册流程，字段反馈清晰",
+      "为你的工作空间创建安全账户",
+      "桌面端与移动端都保持顺滑"
     ],
     "statValue": "3 分钟",
-    "statLabel": "平均设置时间"
+    "statLabel": "平均完成时间"
   },
   "form": {
-    "heading": "创建账号",
-    "subtitle": "设置你的工作区凭证。",
+    "heading": "创建账户",
+    "subtitle": "创建你的工作空间凭据。",
     "fullNameLabel": "姓名",
-    "fullNamePlaceholder": "陈安雅",
+    "fullNamePlaceholder": "陈安然",
     "emailLabel": "工作邮箱",
     "emailPlaceholder": "name@studio.com",
     "passwordLabel": "密码",
@@ -28,22 +28,22 @@
     "confirmPasswordPlaceholder": "再次输入你的密码",
     "toggleShow": "显示",
     "toggleHide": "隐藏",
-    "marketingOptIn": "发送产品更新给我",
-    "marketingHint": "不打扰，随时可取消订阅。",
-    "terms": "我同意条款和隐私政策",
-    "submit": "创建账号",
+    "marketingOptIn": "接收产品更新",
+    "marketingHint": "不过度打扰，随时可以取消。",
+    "terms": "我同意服务条款与隐私政策",
+    "submit": "创建账户",
     "submitLoading": "创建中...",
-    "status": "仅演示。注册请求已预留但未连接后端。",
-    "footerPrompt": "已经有账号？",
+    "status": "填写信息以创建账户。",
+    "footerPrompt": "已经有账户了？",
     "footerAction": "登录"
   },
   "messages": {
-    "secondary": "辅助流程尚未接入。",
-    "invalid": "请完成所有必填项。",
-    "simulating": "模拟请求中，后端接口可随时接入。",
-    "success": "已收到模拟响应，可接入后端。",
-    "error": "仅返回模拟响应，尚未连接后端。",
-    "exception": "模拟请求失败。",
-    "passwordMismatch": "两次密码不一致。"
+    "secondary": "该操作暂未开放。",
+    "invalid": "请填写所有必填项。",
+    "simulating": "创建账户中...",
+    "success": "账户创建成功。",
+    "error": "注册失败，请检查填写的信息后重试。",
+    "exception": "暂时无法完成注册。",
+    "passwordMismatch": "两次输入的密码不一致。"
   }
 }

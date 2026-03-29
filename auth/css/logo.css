@@ -1,43 +1,56 @@
- #lucky-logo {
-  margin: 0;
-  height: auto;
-  background: transparent;
+#lucky-logo {
+  --animation-color: var(--accent, #d8ff63);
+  --text-stroke-color: rgba(255, 255, 255, 0.18);
+  --fs-size: clamp(1.45rem, 2.7vw, 2rem);
+  position: relative;
+  width: max-content;
+  margin: 0 0 8px;
   padding: 0;
   border: none;
+  background: transparent;
   cursor: pointer;
-}
-
-/* button styling */
-#lucky-logo {
-  --border-right: 6px;
-  --text-stroke-color: rgba(224, 224, 224, 0);
-  --animation-color: #39cb80;
-  --fs-size: 2em;
-  letter-spacing: 3px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
   text-decoration: none;
   font-size: var(--fs-size);
-  font-family: "Arial";
-  position: relative;
-  text-transform: uppercase;
+  line-height: 1;
+  font-family: "Bahnschrift SemiCondensed", "Arial Narrow", sans-serif;
   color: transparent;
   -webkit-text-stroke: 1px var(--text-stroke-color);
 }
-/* this is the text, when you hover on button */
+
+#lucky-logo::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 8%;
+  bottom: -12px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--animation-color), transparent);
+  opacity: 0.75;
+}
+
+#Lucky-Studio-actual-text {
+  display: block;
+  opacity: 0.26;
+}
+
 #Lucky-Studio-hover-text {
   position: absolute;
-  box-sizing: border-box;
-  content: attr(data-text);
-  color: var(--animation-color);
-  width: 0%;
   inset: 0;
-  border-right: var(--border-right) solid var(--animation-color);
+  width: 0;
   overflow: hidden;
-  transition: 0.5s;
-  -webkit-text-stroke: 1px var(--animation-color);
+  white-space: nowrap;
+  color: #f7f7f1;
+  border-right: 2px solid var(--animation-color);
+  text-shadow:
+    0 0 22px rgba(216, 255, 99, 0.35),
+    0 0 42px rgba(216, 255, 99, 0.12);
+  -webkit-text-stroke: 0 transparent;
+  transition: width 0.85s cubic-bezier(0.16, 1, 0.3, 1);
 }
-/* hover 或自动激活 */
+
 #lucky-logo:hover .hover-text,
 #lucky-logo.is-active .hover-text {
   width: 100%;
-  filter: drop-shadow(0 0 24px var(--animation-color))
 }

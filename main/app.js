@@ -23,17 +23,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const DEFAULT_STORAGE_SERVER_OPTIONS = [
         { value: 'backend', label: '本地存储 (backend)' },
-        { value: 'baidu_netdisk', label: '百度网盘 (baidu_netdisk)' },
+        { value: 'baiduNetDisk', label: '百度网盘 (baiduNetDisk)' },
         { value: 'oss', label: '对象存储 OSS (oss)' },
         { value: 's3', label: '对象存储 S3 (s3)' },
     ];
 
+    const BAIDU_STORAGE_SERVER_CANONICAL = 'baiduNetDisk';
+
     const BAIDU_STORAGE_SERVER_VALUES = (() => {
         const configured = window.APP_CONFIG && window.APP_CONFIG.BAIDU_STORAGE_SERVER_VALUES;
-        const source = Array.isArray(configured) ? configured : ['baidu_netdisk'];
+        const source = Array.isArray(configured) ? configured : [BAIDU_STORAGE_SERVER_CANONICAL, 'baidu_netdisk'];
         const normalized = source
             .map((item) => String(item || '').trim().toLowerCase())
             .filter(Boolean);
+        if (!normalized.includes('baidunetdisk')) {
+            normalized.push('baidunetdisk');
+        }
         if (!normalized.includes('baidu_netdisk')) {
             normalized.push('baidu_netdisk');
         }
@@ -123,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const normalizeStorageServerValue = (value) => {
         const raw = String(value || '').trim().toLowerCase();
         if (!raw) return '';
-        if (shouldUploadToBaidu(raw)) return 'baidu_netdisk';
+        if (shouldUploadToBaidu(raw)) return BAIDU_STORAGE_SERVER_CANONICAL;
         if (raw === 'local' || raw === 'localhost') return 'backend';
         return raw;
     };
@@ -193,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (requestBaiduUpload && baiduUploaded) {
-            values.push('baidu_netdisk');
+            values.push(BAIDU_STORAGE_SERVER_CANONICAL);
         }
 
         if (!values.length) {
@@ -206,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatStorageServerLabel = (value) => {
         const normalized = normalizeStorageServerValue(value);
         if (normalized === 'backend') return '本地 (backend)';
-        if (normalized === 'baidu_netdisk') return '百度网盘 (baidu_netdisk)';
+        if (normalized === BAIDU_STORAGE_SERVER_CANONICAL) return '百度网盘 (baiduNetDisk)';
         return normalized || '--';
     };
 
@@ -358,6 +363,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const prefixNum = Number(prefixMatch[0]);
         return Number.isFinite(prefixNum) ? prefixNum : NaN;
+    };
+
+    const inferFrameworkFromValue = (value) => {
+        const text = String(value || '').trim().toLowerCase();
+        if (!text) return '';
+        if (text === 'pytorch' || text.includes('torch')) return 'pytorch';
+        if (text === 'onnxruntime' || text === 'onnx' || text.includes('onnx')) return 'onnxruntime';
+        if (text === 'tensorrt' || text === 'trt' || text.includes('tensorrt')) return 'tensorrt';
+        if (text === 'tensorflow' || text === 'tf' || text.includes('tensorflow')) return 'tensorflow';
+        if (text === 'paddle' || text.includes('paddle')) return 'paddle';
+        if (text === 'openvino' || text.includes('openvino')) return 'openvino';
+        if (text === 'ncnn' || text.includes('ncnn')) return 'ncnn';
+        return '';
+    };
+
+    const inferFrameworkFromFileName = (fileName) => {
+        const ext = String(fileName || '').split('.').pop().trim().toLowerCase();
+        if (!ext) return '';
+        if (ext === 'pt' || ext === 'pth' || ext === 'ckpt') return 'pytorch';
+        if (ext === 'onnx') return 'onnxruntime';
+        if (ext === 'engine' || ext === 'trt') return 'tensorrt';
+        return '';
+    };
+
+    const resolveModelFramework = (algorithmId, fileName) => (
+        inferFrameworkFromValue(algorithmId) || inferFrameworkFromFileName(fileName)
+    );
+
+    const getFileExtensionWithDot = (fileName) => {
+        const text = String(fileName || '').trim();
+        const idx = text.lastIndexOf('.');
+        if (idx <= 0 || idx === text.length - 1) return '';
+        return text.slice(idx);
+    };
+
+    const sanitizeFilePart = (value, fallback = 'model') => {
+        const raw = String(value || '').trim();
+        const normalized = raw
+            .replace(/\s+/g, '_')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return normalized || fallback;
+    };
+
+    const buildModelUploadFileName = ({ name, version, originalFileName }) => {
+        const safeName = sanitizeFilePart(name, 'model');
+        const versionText = String(version || '').trim().replace(/^v/i, '');
+        const safeVersion = sanitizeFilePart(versionText, '1');
+        const ext = getFileExtensionWithDot(originalFileName);
+        return `${safeName}_v${safeVersion}${ext}`;
+    };
+
+    const parseVersionParts = (value) => {
+        const raw = String(value == null ? '' : value).trim();
+        if (!raw) return null;
+        const normalized = raw.replace(/^v/i, '');
+        const match = normalized.match(/^(\d+)(?:\.(\d+))?/);
+        if (!match) return null;
+        const major = Number(match[1]);
+        if (!Number.isInteger(major) || major < 0) return null;
+        const minorText = match[2] || '';
+        const minor = minorText ? Number(minorText) : 0;
+        if (!Number.isInteger(minor) || minor < 0) return null;
+        return {
+            major,
+            minor,
+            hasMinor: minorText.length > 0,
+        };
+    };
+
+    const compareVersionParts = (a, b) => {
+        if (!a && !b) return 0;
+        if (!a) return -1;
+        if (!b) return 1;
+        if (a.major !== b.major) return a.major - b.major;
+        return a.minor - b.minor;
+    };
+
+    const getNextVersionTextFromModels = (models = []) => {
+        let latest = null;
+        models.forEach((model) => {
+            const parts = parseVersionParts(model && model.version);
+            if (!parts) return;
+            if (!latest || compareVersionParts(parts, latest) > 0) {
+                latest = parts;
+            }
+        });
+
+        if (!latest) return 'v1.0';
+        if (!latest.hasMinor) return `v${latest.major}.1`;
+
+        const nextMinor = latest.minor + 1;
+        return `v${latest.major}.${nextMinor}`;
     };
 
     async function apiRequest(path, {
@@ -638,12 +737,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const form = new FormData();
-        form.append('file', file);
+        form.append('file', file, file.name);
         if (subdir) form.append('subdir', subdir);
         if (storageServer) form.append('storage_server', storageServer);
         if (uploadToBaidu) form.append('upload_to_baidu', 'true');
 
         return apiRequest(endpoint, {
+            method: 'POST',
+            formData: form,
+        });
+    }
+
+    async function createModelWithFileViaApi({
+        file,
+        model,
+        uploadFileName = '',
+        uploadToBaidu = false,
+    }) {
+        if (!(file instanceof File)) {
+            throw new Error('未选择有效文件');
+        }
+
+        const form = new FormData();
+        const effectiveFileName = String(uploadFileName || '').trim() || file.name;
+        form.append('file', file, effectiveFileName);
+        if (model && typeof model === 'object') {
+            form.append('model', JSON.stringify(model));
+        }
+        if (uploadToBaidu) form.append('upload_to_baidu', 'true');
+
+        return apiRequest('/models', {
             method: 'POST',
             formData: form,
         });
@@ -920,9 +1043,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <label for="model-meta-framework">框架（可空）</label>
                             <input id="model-meta-framework" name="framework" class="form-control" type="text" />
                         </div>
-                        <div class="form-group form-span-2">
-                            <label for="model-meta-storage-servers">存储服务（逗号分隔）</label>
-                            <input id="model-meta-storage-servers" name="storage_servers" class="form-control" type="text" placeholder="backend, baidu_netdisk" />
+                    <div class="form-group form-span-2">
+                        <label for="model-meta-storage-servers">存储服务（逗号分隔）</label>
+                        <input id="model-meta-storage-servers" name="storage_servers" class="form-control" type="text" placeholder="backend, baiduNetDisk" />
                         </div>
                         <div class="form-group">
                             <label for="model-meta-paper">论文链接（可空）</label>
@@ -1180,7 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="storage-sync-option">
                             <input type="radio" name="sync_direction" value="to_baidu">
                             <span class="storage-sync-option-main">本地 -> 百度网盘</span>
-                            <span class="storage-sync-option-sub">追加存储标记：baidu_netdisk</span>
+                            <span class="storage-sync-option-sub">追加存储标记：baiduNetDisk</span>
                         </label>
                         <label class="storage-sync-option">
                             <input type="radio" name="sync_direction" value="to_backend">
@@ -1190,7 +1313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="storage-sync-option">
                             <input type="radio" name="sync_direction" value="both">
                             <span class="storage-sync-option-main">双向同步标记</span>
-                            <span class="storage-sync-option-sub">追加：backend + baidu_netdisk</span>
+                            <span class="storage-sync-option-sub">追加：backend + baiduNetDisk</span>
                         </label>
                     </div>
                     <div class="storage-sync-download-fields" data-storage-download-fields hidden>
@@ -1345,9 +1468,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentEl.textContent = `当前存储标记：${serverText}`;
 
                 const candidate = String(defaultDirection || '').trim();
-                const fallback = normalizedServers.includes('backend') && !normalizedServers.includes('baidu_netdisk')
+                const fallback = normalizedServers.includes('backend') && !normalizedServers.includes(BAIDU_STORAGE_SERVER_CANONICAL)
                     ? 'to_baidu'
-                    : (!normalizedServers.includes('backend') && normalizedServers.includes('baidu_netdisk') ? 'to_backend' : 'both');
+                    : (!normalizedServers.includes('backend') && normalizedServers.includes(BAIDU_STORAGE_SERVER_CANONICAL) ? 'to_backend' : 'both');
                 const selectedDirection = candidate || fallback;
                 radioInputs.forEach((radio) => {
                     radio.checked = radio.value === selectedDirection;
@@ -1425,7 +1548,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const searchInput = document.querySelector('[data-model-search-input]');
         const searchBtn = document.querySelector('[data-model-search-btn]');
         const filterTaskTypeSelect = document.querySelector('[data-model-filter-task-type]');
-        const filterImplTypeInput = document.querySelector('[data-model-filter-impl-type]');
         const filterResetBtn = document.querySelector('[data-model-filter-reset]');
         const importBtn = document.querySelector('[data-model-import-open]');
         const refreshBtn = document.querySelector('[data-model-refresh-btn]');
@@ -1444,6 +1566,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const modelFileInput = document.querySelector('[data-model-file-input]');
         const modelFileHint = document.querySelector('[data-model-file-hint]');
         const modelNameInput = document.querySelector('#model-name');
+        const modelVersionInput = document.querySelector('#model-version');
         const modelSizeInput = document.querySelector('#model-size-mb');
         const modelPathInput = document.querySelector('#model-path');
         const modelImplTypeInput = document.querySelector('#model-impl-type');
@@ -1458,7 +1581,6 @@ document.addEventListener('DOMContentLoaded', () => {
             pageSize: Number(pageSizeSelect && pageSizeSelect.value) || 10,
             keyword: '',
             taskType: '',
-            implType: '',
             sizeSort: '',
             total: 0,
             rows: [],
@@ -1467,7 +1589,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let searchTimer = null;
         let selectedModelFile = null;
-        const modelDefaultFileHint = '支持拖拽/点选，提交时会先调用文件上传接口，再写入模型元数据。';
+        let versionSuggestTimer = null;
+        let versionSuggestToken = 0;
+        const modelDefaultFileHint = '';
 
         const setLoadingState = (loading) => {
             state.loading = loading;
@@ -1477,7 +1601,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshBtn,
                 pageSizeSelect,
                 filterTaskTypeSelect,
-                filterImplTypeInput,
                 filterResetBtn,
             ].forEach((el) => {
                 if (el) el.disabled = loading;
@@ -1486,6 +1609,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const renderPlaceholderRow = (message) => {
             tbody.innerHTML = `<tr><td colspan="7" class="table-state">${escapeHtml(message)}</td></tr>`;
+        };
+
+        const fetchNextModelVersionByName = async (modelName) => {
+            const safeName = String(modelName || '').trim();
+            if (!safeName) return 'v1.0';
+
+            const pageSize = 100;
+            const allModels = [];
+            let page = 1;
+            let total = 0;
+
+            while (page <= 20) {
+                const data = await apiRequest('/models', {
+                    query: {
+                        name: safeName,
+                        page,
+                        page_size: pageSize,
+                    },
+                });
+                const list = Array.isArray(data && data.list) ? data.list : [];
+                if (!list.length) break;
+                allModels.push(...list);
+                total = Number(data && data.total);
+                if (!Number.isFinite(total) || allModels.length >= total) break;
+                page += 1;
+            }
+
+            return getNextVersionTextFromModels(allModels);
+        };
+
+        const suggestVersionForModelName = async () => {
+            if (!modelNameInput || !modelVersionInput) return;
+            const safeName = String(modelNameInput.value || '').trim();
+            if (!safeName) return;
+
+            const currentToken = ++versionSuggestToken;
+            try {
+                const nextVersion = await fetchNextModelVersionByName(safeName);
+                if (currentToken !== versionSuggestToken) return;
+                modelVersionInput.value = nextVersion;
+            } catch (error) {
+                if (currentToken !== versionSuggestToken) return;
+                console.warn('Failed to suggest model version:', error);
+            }
+        };
+
+        const scheduleVersionSuggestion = () => {
+            if (versionSuggestTimer) {
+                clearTimeout(versionSuggestTimer);
+            }
+            versionSuggestTimer = setTimeout(() => {
+                suggestVersionForModelName();
+            }, 300);
         };
 
         const getVersionBadgeClass = (version) => {
@@ -1542,8 +1718,39 @@ document.addEventListener('DOMContentLoaded', () => {
             return hash % 6;
         };
 
+        const getModelResolvedPath = (model) => String(
+            model && (model.model_path || model.saved_path || model.resolved_path || ''),
+        ).trim();
+
+        const getModelWeightFileName = (model) => String(
+            (model && model.weight_name) ||
+            (model && model.file_name) ||
+            getPathFileName(getModelResolvedPath(model)),
+        ).trim();
+
+        const getModelAlgorithmLabel = (model) => String(
+            (model && model.algorithm_id) ||
+            (model && model.impl_type) ||
+            (model && model.framework) ||
+            '',
+        ).trim() || 'Unknown';
+
+        const getModelWeightSizeMB = (model) => (
+            model && (model.weight_size_mb ?? model.size_mb)
+        );
+
+        const getModelCreatedTime = (model) => (
+            model && (model.create_time || model.created_at)
+        );
+
         const getStatusMeta = (model) => {
-            const hasCoreFields = Boolean(model.name && model.model_path && model.impl_type && model.task_type);
+            const hasCoreFields = Boolean(
+                model &&
+                model.name &&
+                getModelWeightFileName(model) &&
+                getModelAlgorithmLabel(model) &&
+                model.task_type,
+            );
             if (hasCoreFields) {
                 return { cls: 'success', text: '可用' };
             }
@@ -1560,10 +1767,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const modelName = escapeHtml(model.name || '--');
                 const version = model.version ? escapeHtml(model.version) : 'No Version';
                 const versionBadgeClass = getVersionBadgeClass(model.version);
-                const implType = escapeHtml(model.impl_type || 'Unknown');
+                const implType = escapeHtml(getModelAlgorithmLabel(model));
                 const taskType = escapeHtml(formatTaskType(model.task_type));
-                const sizeText = escapeHtml(formatSizeMB(model.size_mb));
-                const createdAt = escapeHtml(formatDateTime(model.created_at));
+                const sizeText = escapeHtml(formatSizeMB(getModelWeightSizeMB(model)));
+                const createdAt = escapeHtml(formatDateTime(getModelCreatedTime(model)));
                 const status = getStatusMeta(model);
                 const rowId = Number(model.id) || '';
                 const nameLabels = getModelNameLabels(model);
@@ -1683,10 +1890,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.taskType) {
                     query.task_type = state.taskType;
                 }
-                if (state.implType) {
-                    query.impl_type = state.implType;
-                }
-
                 if (state.sizeSort) {
                     query.size_sort = state.sizeSort;
                 }
@@ -1722,7 +1925,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const applySearch = () => {
             state.keyword = (searchInput && searchInput.value || '').trim();
             state.taskType = String(filterTaskTypeSelect && filterTaskTypeSelect.value || '').trim();
-            state.implType = String(filterImplTypeInput && filterImplTypeInput.value || '').trim();
             state.page = 1;
             fetchModels();
         };
@@ -1732,7 +1934,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(searchTimer);
                 searchTimer = setTimeout(() => {
                     applySearch();
-                }, 300);
+                }, 1500);
             });
 
             searchInput.addEventListener('keydown', (e) => {
@@ -1758,27 +1960,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        if (filterImplTypeInput) {
-            filterImplTypeInput.addEventListener('input', () => {
-                clearTimeout(searchTimer);
-                searchTimer = setTimeout(() => {
-                    applySearch();
-                }, 300);
-            });
-
-            filterImplTypeInput.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter') return;
-                e.preventDefault();
-                clearTimeout(searchTimer);
-                applySearch();
-            });
-        }
-
         if (filterResetBtn) {
             filterResetBtn.addEventListener('click', () => {
                 if (searchInput) searchInput.value = '';
                 if (filterTaskTypeSelect) filterTaskTypeSelect.value = '';
-                if (filterImplTypeInput) filterImplTypeInput.value = '';
                 clearTimeout(searchTimer);
                 applySearch();
             });
@@ -1881,12 +2066,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (action === 'download-file' || action === 'copy-path') {
                     const modelName = String(currentModel.name || '').trim() || `#${modelId}`;
-                    const fallbackFileName = String(
-                        currentModel.weight_name ||
-                        currentModel.file_name ||
-                        getPathFileName(currentModel.model_path) ||
-                        `model-${modelId}`,
-                    ).trim();
+                    const fallbackFileName = getModelWeightFileName(currentModel) || `model-${modelId}`;
                     actionBtn.disabled = true;
                     try {
                         await downloadModelFileById(modelId, fallbackFileName);
@@ -1905,7 +2085,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         ...(Array.isArray(currentModel.storage_servers) ? currentModel.storage_servers : []),
                         currentModel.storage_server,
                     ]);
-                    const modelPath = String(currentModel.model_path || '').trim();
+                    const modelPath = getModelResolvedPath(currentModel);
+                    const modelWeightName = getModelWeightFileName(currentModel);
                     const syncModal = ensureStorageSyncModal();
                     const syncPlan = await syncModal.open({
                         title: `模型同步 - ${modelName}`,
@@ -1913,7 +2094,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         defaultRemotePath: modelPath,
                         defaultCategory: 'weights',
                         defaultSubdir: 'sync',
-                        defaultFileName: getPathFileName(modelPath),
+                        defaultFileName: modelWeightName || getPathFileName(modelPath),
                     });
                     if (!syncPlan) return;
 
@@ -1921,9 +2102,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const downloadPlan = syncPlan.download || null;
 
                     const directionToServers = {
-                        to_baidu: ['baidu_netdisk'],
+                        to_baidu: [BAIDU_STORAGE_SERVER_CANONICAL],
                         to_backend: ['backend'],
-                        both: ['backend', 'baidu_netdisk'],
+                        both: ['backend', BAIDU_STORAGE_SERVER_CANONICAL],
                     };
                     const plannedServers = uniqueStorageServers(directionToServers[direction] || []);
                     const serversToAdd = plannedServers.filter((value) => !currentServers.includes(value));
@@ -1974,7 +2155,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (action === 'delete') {
-                    showAlert(messageSlot, '删除接口暂未在 API 文档中提供，当前仅支持列表与导入。', 'info');
+                    const modelName = String(currentModel.name || '').trim() || `#${modelId}`;
+                    const fileName = getModelWeightFileName(currentModel);
+                    if (!fileName) {
+                        showAlert(messageSlot, `模型“${modelName}”缺少 weight_name，无法调用删除接口。`, 'error');
+                        return;
+                    }
+                    const confirmed = window.confirm(`确认删除模型“${modelName}”及其文件吗？`);
+                    if (!confirmed) return;
+
+                    actionBtn.disabled = true;
+                    try {
+                        const deleteResult = await apiRequest('/models/by-filename', {
+                            method: 'DELETE',
+                            query: { file_name: fileName },
+                        });
+                        const deletedRecords = Number(deleteResult && deleteResult.deleted_records);
+                        const updatedRecords = Number(deleteResult && deleteResult.updated_records);
+                        const summary = Number.isFinite(deletedRecords) || Number.isFinite(updatedRecords)
+                            ? `deleted_records=${Number.isFinite(deletedRecords) ? deletedRecords : 0}, updated_records=${Number.isFinite(updatedRecords) ? updatedRecords : 0}`
+                            : 'delete success';
+                        showAlert(messageSlot, `模型“${modelName}”删除成功：${summary}`, 'info');
+                        await fetchModels();
+                    } catch (error) {
+                        showAlert(messageSlot, `模型“${modelName}”删除失败：${error.message}`, 'error');
+                    } finally {
+                        actionBtn.disabled = false;
+                    }
                 }
             });
         }
@@ -2006,6 +2213,11 @@ document.addEventListener('DOMContentLoaded', () => {
             importModal.hidden = true;
             setImportFeedback('');
             selectedModelFile = null;
+            versionSuggestToken += 1;
+            if (versionSuggestTimer) {
+                clearTimeout(versionSuggestTimer);
+                versionSuggestTimer = null;
+            }
             if (importForm) importForm.reset();
             if (modelFileHint) {
                 modelFileHint.textContent = modelDefaultFileHint;
@@ -2041,9 +2253,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (modelSizeInput && !modelSizeInput.value) {
                     modelSizeInput.value = bytesToMB(file.size);
                 }
-                if (modelPathInput && !modelPathInput.value.trim()) {
-                    modelPathInput.value = `/uploads/models/${file.name}`;
-                }
                 if (modelImplTypeInput && !modelImplTypeInput.value.trim()) {
                     const ext = (file.name.split('.').pop() || '').toLowerCase();
                     if (ext === 'onnx') modelImplTypeInput.value = 'onnxruntime';
@@ -2051,8 +2260,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (ext === 'engine' || ext === 'trt') modelImplTypeInput.value = 'tensorrt';
                     if (ext === 'bin') modelImplTypeInput.value = 'binary_model';
                 }
+                if (modelNameInput && modelNameInput.value.trim()) {
+                    scheduleVersionSuggestion();
+                }
             },
         });
+
+        if (modelNameInput) {
+            modelNameInput.addEventListener('input', () => {
+                scheduleVersionSuggestion();
+            });
+        }
 
         if (importForm) {
             importForm.addEventListener('submit', async (e) => {
@@ -2075,20 +2293,42 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                if (!(selectedModelFile instanceof File)) {
+                    setImportFeedback('请选择要上传的模型文件，后端现在要求通过 file 字段提交文件内容。', 'error');
+                    return;
+                }
+
                 let resolvedStorageServer = String(formData.get('storage_server') || '').trim();
-                let resolvedModelPath = String(formData.get('model_path') || '').trim();
                 let resolvedSizeMb = sizeMb;
                 const requestBaiduUpload = shouldUploadToBaidu(resolvedStorageServer);
                 let baiduUploaded = false;
+                const implType = String(formData.get('impl_type') || '').trim();
+                const storageServers = uniqueStorageServers([resolvedStorageServer]);
+                const resolvedFramework = resolveModelFramework(
+                    implType,
+                    selectedModelFile && selectedModelFile.name,
+                );
+                const modelName = String(formData.get('name') || '').trim();
+                const uploadFileName = buildModelUploadFileName({
+                    name: modelName,
+                    version: versionRaw,
+                    originalFileName: selectedModelFile && selectedModelFile.name,
+                });
 
                 const payload = {
-                    name: String(formData.get('name') || '').trim(),
-                    storage_server: resolvedStorageServer,
-                    model_path: resolvedModelPath,
-                    impl_type: String(formData.get('impl_type') || '').trim(),
-                    size_mb: resolvedSizeMb,
+                    name: modelName,
                     task_type: String(formData.get('task_type') || '').trim(),
+                    algorithm_id: implType,
+                    weight_size_mb: resolvedSizeMb,
+                    weight_name: uploadFileName,
+                    storage_server: JSON.stringify(storageServers),
+                    storage_servers: storageServers,
+                    base_model_id: 0,
                 };
+
+                if (resolvedFramework) {
+                    payload.framework = resolvedFramework;
+                }
 
                 if (Number.isFinite(versionNum)) {
                     payload.version = versionNum;
@@ -2099,7 +2339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload.description = description;
                 }
                 if (selectedModelFile && !payload.description) {
-                    payload.description = `Selected local file: ${selectedModelFile.name}`;
+                    payload.description = `Selected local file: ${uploadFileName}`;
                 }
 
                 try {
@@ -2107,68 +2347,45 @@ document.addEventListener('DOMContentLoaded', () => {
                         submitBtn.disabled = true;
                         submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 导入中';
                     }
+                    setImportFeedback('正在上传模型文件并创建模型记录...', 'info');
+                    const createdModel = await createModelWithFileViaApi({
+                        file: selectedModelFile,
+                        model: payload,
+                        uploadFileName,
+                        uploadToBaidu: requestBaiduUpload,
+                    });
 
-                    if (selectedModelFile) {
-                        setImportFeedback('正在上传模型文件...', 'info');
-                        const uploadResult = await uploadFileViaApi('/models/upload', {
-                            file: selectedModelFile,
-                            storageServer: resolvedStorageServer,
-                            subdir: (window.APP_CONFIG && window.APP_CONFIG.MODEL_UPLOAD_SUBDIR) || 'web-models',
-                            uploadToBaidu: requestBaiduUpload,
-                        });
-
-                        baiduUploaded = isTruthyFlag(uploadResult && uploadResult.baidu_uploaded);
-                        if (requestBaiduUpload && !baiduUploaded) {
-                            throw new Error('已选择百度网盘，但网盘上传失败，请检查后端百度网盘配置。');
-                        }
-
-                        const preferredPath = requestBaiduUpload
-                            ? (uploadResult && (uploadResult.baidu_path || uploadResult.saved_path))
-                            : (uploadResult && uploadResult.saved_path);
-                        if (preferredPath) {
-                            resolvedModelPath = String(preferredPath);
-                            payload.model_path = resolvedModelPath;
-                            if (modelPathInput) {
-                                modelPathInput.value = resolvedModelPath;
-                            }
-                        }
-
-                        if (!requestBaiduUpload && uploadResult && uploadResult.storage_server) {
-                            resolvedStorageServer = String(uploadResult.storage_server);
-                            payload.storage_server = resolvedStorageServer;
-                            if (modelStorageServerSelect) {
-                                modelStorageServerSelect.value = resolvedStorageServer;
-                            }
-                        }
-                        if (requestBaiduUpload) {
-                            payload.storage_server = resolvedStorageServer;
-                        }
-
-                        const uploadedBytes = Number(uploadResult && uploadResult.size);
-                        if (Number.isFinite(uploadedBytes) && uploadedBytes > 0) {
-                            resolvedSizeMb = Number(bytesToMB(uploadedBytes));
-                            payload.size_mb = resolvedSizeMb;
-                            if (modelSizeInput) {
-                                modelSizeInput.value = String(resolvedSizeMb);
-                            }
-                        }
-
-                        if (!payload.model_path) {
-                            throw new Error('文件上传成功但未返回保存路径(saved_path)');
-                        }
-                        if (requestBaiduUpload) {
-                            const baiduPath = uploadResult && uploadResult.baidu_path ? String(uploadResult.baidu_path) : '';
-                            const detail = baiduPath ? `（网盘路径：${baiduPath}）` : '';
-                            setImportFeedback(`文件上传成功，已同步到百度网盘${detail}，正在创建模型记录...`, 'info');
-                        } else {
-                            setImportFeedback('文件上传成功，正在创建模型记录...', 'info');
+                    const createdStorageServers = parseStorageServers(
+                        createdModel && createdModel.storage_servers,
+                        createdModel && createdModel.storage_server,
+                    );
+                    if (createdStorageServers.length) {
+                        resolvedStorageServer = createdStorageServers[0];
+                        if (modelStorageServerSelect) {
+                            modelStorageServerSelect.value = resolvedStorageServer;
                         }
                     }
 
-                    const createdModel = await apiRequest('/models', {
-                        method: 'POST',
-                        body: payload,
-                    });
+                    baiduUploaded = createdStorageServers.some(
+                        (server) => normalizeStorageServerValue(server) === BAIDU_STORAGE_SERVER_CANONICAL,
+                    );
+
+                    const returnedSizeMb = Number(
+                        createdModel && (createdModel.weight_size_mb ?? createdModel.size_mb),
+                    );
+                    if (Number.isFinite(returnedSizeMb) && returnedSizeMb > 0) {
+                        resolvedSizeMb = returnedSizeMb;
+                        if (modelSizeInput) {
+                            modelSizeInput.value = String(resolvedSizeMb);
+                        }
+                    }
+
+                    const returnedModelPath = String(
+                        createdModel && (createdModel.model_path || createdModel.saved_path || createdModel.resolved_path || ''),
+                    ).trim();
+                    if (returnedModelPath && modelPathInput) {
+                        modelPathInput.value = returnedModelPath;
+                    }
 
                     let syncWarning = '';
                     const createdModelId = getCreatedEntityId(createdModel);
@@ -2394,7 +2611,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     resolvedDataset && resolvedDataset.storage_server,
                                 );
                                 const input = window.prompt(
-                                    '请输入 storage_server（多个值用逗号分隔，例如 backend,baidu_netdisk）',
+                                    '请输入 storage_server（多个值用逗号分隔，例如 backend,baiduNetDisk）',
                                     existingServers.join(', '),
                                 );
                                 if (input === null) return;
