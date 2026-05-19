@@ -1,6 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+﻿document.addEventListener('DOMContentLoaded', () => {
     const mainContent = document.getElementById('main-content');
     const navItems = document.querySelectorAll('.nav-item:not(.has-submenu)');
+    const authSession = window.LP_AUTH || null;
+    const CURRENT_PAGE_STORAGE_KEY = 'LP_CURRENT_PAGE';
 
     const DEFAULT_API_BASE_URL = 'http://localhost:8080/v1';
     let runtimeBaseUrl = '';
@@ -12,6 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const configuredBaseUrl = runtimeBaseUrl || (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL);
     const apiBaseUrl = (configuredBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
     const timeoutMs = Number(window.APP_CONFIG && window.APP_CONFIG.API_TIMEOUT_MS) || 15000;
+    const baiduOAuthBindEndpoint = String(
+        (window.APP_CONFIG && window.APP_CONFIG.BAIDU_OAUTH_BIND_ENDPOINT) || '/baidu/oauth/token',
+    ).trim() || '/baidu/oauth/token';
+    const baiduOAuthDocUrl = String(
+        (window.APP_CONFIG && window.APP_CONFIG.BAIDU_OAUTH_DOC_URL) || 'https://pan.baidu.com/union/doc/6l0ryrjzv',
+    ).trim() || 'https://pan.baidu.com/union/doc/6l0ryrjzv';
 
     const TASK_TYPE_MAP = {
         detect: '检测 (Detection)',
@@ -46,6 +54,107 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
 
     let storageServerOptionsCache = null;
+    let storageServerOptionsLoadError = null;
+
+    // getAccessToken returns the current stored access token for API requests.
+    const getAccessToken = () => {
+        if (!authSession || typeof authSession.getAccessToken !== 'function') return '';
+        return String(authSession.getAccessToken() || '').trim();
+    };
+
+    // applyCurrentUserProfile writes the stored user profile into the sidebar.
+    const applyCurrentUserProfile = () => {
+        if (!authSession || typeof authSession.getStoredUser !== 'function') return;
+        const user = authSession.getStoredUser();
+        if (!user || typeof user !== 'object') return;
+
+        const avatarEl = document.querySelector('[data-current-user-avatar]');
+        const nameEl = document.querySelector('[data-current-user-name]');
+        const emailEl = document.querySelector('[data-current-user-email]');
+        const statusEl = document.querySelector('[data-current-user-status]');
+        const fullName = String(user.fullName || user.nickname || user.username || user.name || user.email || 'User').trim();
+        const email = String(user.email || '').trim();
+        const role = String(user.role || 'user').trim();
+        const roleLabel = role ? role.charAt(0).toUpperCase() + role.slice(1) : 'User';
+
+        if (avatarEl) {
+            avatarEl.textContent = fullName.slice(0, 1).toUpperCase() || 'U';
+        }
+        if (nameEl) {
+            nameEl.textContent = fullName;
+        }
+        if (emailEl) {
+            emailEl.textContent = email || 'unknown@luckey.studio';
+        }
+        if (statusEl) {
+            statusEl.textContent = roleLabel;
+        }
+    };
+
+    // buildAuthHeaders appends the bearer token to outgoing API headers.
+    const buildAuthHeaders = (headers = {}) => {
+        const nextHeaders = { ...headers };
+        const token = getAccessToken();
+        if (token && !nextHeaders.Authorization) {
+            nextHeaders.Authorization = `Bearer ${token}`;
+        }
+        return nextHeaders;
+    };
+
+    // handleUnauthorizedAccess clears stale session data and returns to login.
+    const handleUnauthorizedAccess = () => {
+        if (authSession && typeof authSession.clearSession === 'function') {
+            authSession.clearSession();
+        }
+        if (authSession && typeof authSession.redirectToLogin === 'function') {
+            authSession.redirectToLogin();
+        }
+    };
+
+    // normalizeDashboardPageName maps removed pages to their replacement destinations.
+    const normalizeDashboardPageName = (pageName) => {
+        const safePageName = String(pageName || '').trim();
+        if (safePageName === 'training-results' || safePageName === 'model-training') {
+            return 'model-validation';
+        }
+        return safePageName;
+    };
+
+    // persistCurrentPage stores the current dashboard page so refresh can restore it.
+    const persistCurrentPage = (pageName) => {
+        const safePageName = normalizeDashboardPageName(pageName);
+        if (!safePageName) return;
+        try {
+            window.localStorage.setItem(CURRENT_PAGE_STORAGE_KEY, safePageName);
+        } catch (error) {
+            // Ignore storage failures and keep runtime behavior unchanged.
+        }
+    };
+
+    // readPersistedCurrentPage returns the last stored dashboard page name.
+    const readPersistedCurrentPage = () => {
+        try {
+            return String(window.localStorage.getItem(CURRENT_PAGE_STORAGE_KEY) || '').trim();
+        } catch (error) {
+            return '';
+        }
+    };
+
+    // isSupportedDashboardPage checks whether a page name matches an existing sidebar destination.
+    const isSupportedDashboardPage = (pageName) => {
+        const safePageName = normalizeDashboardPageName(pageName);
+        if (!safePageName) return false;
+        return Array.from(navItems).some((item) => String(item.getAttribute('data-page') || '').trim() === safePageName);
+    };
+
+    // updateActiveNavigation synchronizes sidebar active styles with the current page.
+    const updateActiveNavigation = (pageName) => {
+        const safePageName = normalizeDashboardPageName(pageName);
+        navItems.forEach((item) => {
+            const itemPage = String(item.getAttribute('data-page') || '').trim();
+            item.classList.toggle('active', itemPage === safePageName);
+        });
+    };
 
     const escapeHtml = (value) => {
         const str = String(value == null ? '' : value);
@@ -87,6 +196,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const hh = String(date.getHours()).padStart(2, '0');
         const min = String(date.getMinutes()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+    };
+
+    const formatDuration = (rawSeconds) => {
+        const totalSeconds = Math.max(0, Math.round(Number(rawSeconds) || 0));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (hours > 0) {
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
     const bytesToMB = (bytes) => {
@@ -478,7 +598,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const finalHeaders = {
                 Accept: 'application/json',
-                ...headers,
+                ...buildAuthHeaders(headers),
             };
             const options = {
                 method,
@@ -528,7 +648,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const message = data && typeof data === 'object' && data.error
                     ? data.error
                     : `请求失败 (${res.status})`;
-                throw new Error(message);
+                const error = new Error(message);
+                error.status = res.status;
+                error.responseData = data;
+                if (res.status === 401) {
+                    handleUnauthorizedAccess();
+                }
+                throw error;
             }
 
             return data;
@@ -541,6 +667,19 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(timer);
         }
     }
+
+    // buildVideoFrameDownloadUrl returns the ZIP download URL for a video's frame results.
+    const buildVideoFrameDownloadUrl = (video) => {
+        const id = Number(video && video.id);
+        if (!Number.isInteger(id) || id <= 0) return '';
+        if (!video || !video.frame_capture_completed) return '';
+
+        const explicitUrl = String(video.frame_download_url || '').trim();
+        if (explicitUrl) {
+            return explicitUrl;
+        }
+        return `${apiBaseUrl}/videos/${id}/frames/fixed/download`;
+    };
 
     const parseAttachmentFileName = (contentDisposition) => {
         const header = String(contentDisposition || '').trim();
@@ -575,12 +714,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'GET',
                 headers: {
                     Accept: '*/*',
+                    ...buildAuthHeaders(),
                 },
                 credentials: 'include',
                 signal: controller.signal,
             });
 
             if (!res.ok) {
+                if (res.status === 401) {
+                    handleUnauthorizedAccess();
+                }
                 let message = `下载失败 (${res.status})`;
                 try {
                     const text = await res.text();
@@ -628,20 +771,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const normalizeStorageOptions = (source) => {
-        if (!Array.isArray(source)) return [];
+        const normalizeSourceToArray = (input) => {
+            if (Array.isArray(input)) return input;
+            if (!input || typeof input !== 'object') return [];
+
+            // Support object-map style payloads, e.g.:
+            // { "backend": {...}, "remote-a": {...} }
+            return Object.entries(input).map(([key, value]) => {
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    return {
+                        ...value,
+                        name: value.name || value.Name || key,
+                        value: value.value || value.Value || value.name || value.Name || key,
+                        state: value.state || value.State || value.status || value.Status || '',
+                    };
+                }
+                if (typeof value === 'string') {
+                    return { name: value, value };
+                }
+                return { name: key, value: key };
+            });
+        };
+
+        const sourceArray = normalizeSourceToArray(source);
+        if (!sourceArray.length) return [];
         const result = [];
-        source.forEach((item) => {
+        sourceArray.forEach((item) => {
             if (typeof item === 'string') {
-                const value = item.trim();
+                const value = normalizeStorageServerValue(item);
                 if (!value) return;
-                result.push({ value, label: value });
+                result.push({ value, label: formatStorageServerLabel(value) });
                 return;
             }
             if (!item || typeof item !== 'object') return;
-            const value = String(item.value || item.id || item.key || item.code || '').trim();
+            const stateText = String(item.state || item.State || item.status || item.Status || '').trim().toLowerCase();
+            if (stateText === 'inactive') return;
+            const rawValue = String(
+                item.value
+                || item.Value
+                || item.name
+                || item.Name
+                || item.id
+                || item.key
+                || item.code
+                || item.server_name
+                || item.storage_server
+                || item.storageServer
+                || '',
+            ).trim();
+            const value = normalizeStorageServerValue(rawValue);
             if (!value) return;
-            const label = String(item.label || item.name || item.title || value).trim();
-            result.push({ value, label: label || value });
+            const label = String(
+                item.label
+                || item.Label
+                || item.title
+                || item.display_name
+                || item.displayName
+                || item.name
+                || item.Name
+                || '',
+            ).trim();
+            result.push({ value, label: label || formatStorageServerLabel(value) });
         });
 
         const unique = [];
@@ -686,44 +876,87 @@ document.addEventListener('DOMContentLoaded', () => {
             return storageServerOptionsCache;
         }
 
-        const endpoint = window.APP_CONFIG && window.APP_CONFIG.STORAGE_SERVER_OPTIONS_API;
-        if (typeof endpoint === 'string' && endpoint.trim()) {
+        const configuredEndpoint = window.APP_CONFIG && window.APP_CONFIG.STORAGE_SERVER_OPTIONS_API;
+        const endpoint = (typeof configuredEndpoint === 'string' && configuredEndpoint.trim())
+            ? configuredEndpoint.trim()
+            : '/core-servers';
+        if (endpoint) {
             try {
-                const data = await apiRequest(endpoint.trim(), { method: 'GET' });
-                const list = (data && data.list) || (data && data.options) || (data && data.data) || data;
+                const data = await apiRequest(endpoint, { method: 'GET' });
+                const list = (data && data.list)
+                    || (data && data.options)
+                    || (data && data.items)
+                    || (data && data.core_servers)
+                    || (data && data.storage_servers)
+                    || (data && data.data && data.data.list)
+                    || (data && data.data && data.data.items)
+                    || (data && data.data && data.data.core_servers)
+                    || (data && data.data)
+                    || data;
                 const fromApi = normalizeStorageOptions(list);
                 if (fromApi.length) {
                     storageServerOptionsCache = fromApi;
+                    storageServerOptionsLoadError = null;
                     return storageServerOptionsCache;
                 }
+                throw new Error('存储服务列表为空');
             } catch (error) {
-                // Fall back to defaults when storage options API is unavailable.
+                storageServerOptionsLoadError = `无法加载存储服务：${error.message}`;
+                throw new Error(storageServerOptionsLoadError);
             }
         }
 
         const fromConfig = getConfiguredStorageOptions();
         if (fromConfig) {
             storageServerOptionsCache = fromConfig;
+            storageServerOptionsLoadError = null;
             return storageServerOptionsCache;
         }
 
         storageServerOptionsCache = DEFAULT_STORAGE_SERVER_OPTIONS;
+        storageServerOptionsLoadError = null;
         return storageServerOptionsCache;
     }
 
+    // filterStorageOptionsForScope limits storage server options for specific form scopes.
+    function filterStorageOptionsForScope(options = [], scope = '') {
+        const safeScope = String(scope || '').trim().toLowerCase();
+        if (safeScope !== 'model') return Array.isArray(options) ? options : [];
+
+        return (Array.isArray(options) ? options : []).filter((item) => {
+            const value = normalizeStorageServerValue(item && item.value);
+            return value === 'backend' || value === BAIDU_STORAGE_SERVER_CANONICAL;
+        });
+    }
+
+    // populateStorageServerSelects loads and applies storage server options for form selects.
     async function populateStorageServerSelects(root = document) {
         if (!root || typeof root.querySelectorAll !== 'function') return;
         const selects = root.querySelectorAll('[data-storage-server-select]');
         if (!selects || selects.length === 0) return;
 
-        const options = await loadStorageServerOptions();
-        selects.forEach((selectEl) => {
-            const currentValue = selectEl.value || '';
-            setSelectOptions(selectEl, options, {
-                placeholder: '请选择存储服务',
-                selectedValue: currentValue,
+        try {
+            const options = await loadStorageServerOptions();
+            selects.forEach((selectEl) => {
+                const currentValue = selectEl.value || '';
+                const scope = String(selectEl.dataset.storageServerScope || '').trim();
+                const scopedOptions = filterStorageOptionsForScope(options, scope);
+                setSelectOptions(selectEl, scopedOptions, {
+                    placeholder: '请选择存储服务',
+                    selectedValue: currentValue,
+                });
+                selectEl.disabled = false;
             });
-        });
+        } catch (error) {
+            const message = String(error && error.message || '存储服务加载失败').trim();
+            selects.forEach((selectEl) => {
+                selectEl.innerHTML = `<option value="">${escapeHtml(message)}</option>`;
+                selectEl.value = '';
+                selectEl.disabled = true;
+                selectEl.title = message;
+            });
+            throw error;
+        }
     }
 
     async function uploadFileViaApi(endpoint, {
@@ -802,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="form-divider"></div>
                 <div class="property-toolbar">
-                    <span class="property-meta" data-property-meta>0 个字段</span>
+                    <span class="property-meta" data-property-meta>0 涓瓧娈?/span>
                     <div class="property-toolbar-actions">
                         <button class="btn btn-secondary" type="button" data-property-edit hidden>
                             <i class="fa-solid fa-pen"></i>
@@ -1021,7 +1254,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input id="model-meta-task-type" name="task_type" class="form-control" type="text" required />
                         </div>
                         <div class="form-group">
-                            <label for="model-meta-weight-name">权重文件名 <span class="required-mark" aria-hidden="true">*</span></label>
+                            <label for="model-meta-weight-name">权重文件名<span class="required-mark" aria-hidden="true">*</span></label>
                             <input id="model-meta-weight-name" name="weight_name" class="form-control" type="text" required />
                         </div>
                         <div class="form-group">
@@ -1174,7 +1407,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isBaseModel === 'no') {
                 const baseModelRaw = String(baseModelIdInput && baseModelIdInput.value || '').trim();
                 if (!baseModelRaw) {
-                    throw new Error('选择“不是基础模型”时，必须填写基础模型ID。');
+                    throw new Error('选择“非基础模型”时，必须填写基础模型ID。');
                 }
                 const baseModelID = Number(baseModelRaw);
                 if (!Number.isInteger(baseModelID) || baseModelID <= 0) {
@@ -1295,7 +1528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
-                <p class="modal-subtitle">请选择同步方向（用于更新存储服务标记）。</p>
+                <p class="modal-subtitle">模型同步仅支持本地与百度网盘之间双向同步。</p>
                 <div class="form-divider"></div>
                 <div class="storage-sync-current" data-storage-sync-current></div>
                 <form data-storage-sync-form>
@@ -1308,39 +1541,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="storage-sync-option">
                             <input type="radio" name="sync_direction" value="to_backend">
                             <span class="storage-sync-option-main">百度网盘 -> 本地</span>
-                            <span class="storage-sync-option-sub">追加存储标记：backend</span>
+                            <span class="storage-sync-option-sub">按当前模型网盘路径下载到固定 weights 目录，并追加存储标记：backend</span>
                         </label>
-                        <label class="storage-sync-option">
-                            <input type="radio" name="sync_direction" value="both">
-                            <span class="storage-sync-option-main">双向同步标记</span>
-                            <span class="storage-sync-option-sub">追加：backend + baiduNetDisk</span>
-                        </label>
-                    </div>
-                    <div class="storage-sync-download-fields" data-storage-download-fields hidden>
-                        <h4>百度网盘下载到本地</h4>
-                        <div class="form-grid-2">
-                            <div class="form-group form-span-2">
-                                <label for="storage-sync-remote-path">网盘文件路径 remote_path <span class="required-mark" aria-hidden="true">*</span></label>
-                                <input id="storage-sync-remote-path" name="remote_path" class="form-control" type="text" data-storage-remote-path placeholder="/project/luckyProject/weights/model.pt" />
-                            </div>
-                            <div class="form-group">
-                                <label for="storage-sync-category">下载类别 category</label>
-                                <select id="storage-sync-category" name="category" class="form-control" data-storage-category>
-                                    <option value="weights">weights</option>
-                                    <option value="models">models</option>
-                                    <option value="datasets">datasets</option>
-                                    <option value="dataset">dataset</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="storage-sync-subdir">本地子目录 subdir（可选）</label>
-                                <input id="storage-sync-subdir" name="subdir" class="form-control" type="text" data-storage-subdir placeholder="sync" />
-                            </div>
-                            <div class="form-group form-span-2">
-                                <label for="storage-sync-file-name">保存文件名 file_name（可选）</label>
-                                <input id="storage-sync-file-name" name="file_name" class="form-control" type="text" data-storage-file-name placeholder="model.pt" />
-                            </div>
-                        </div>
                     </div>
                     <div class="form-actions modal-actions">
                         <button class="btn btn-secondary" type="button" data-storage-sync-cancel>取消</button>
@@ -1359,28 +1561,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const formEl = overlay.querySelector('[data-storage-sync-form]');
         const cancelBtns = overlay.querySelectorAll('[data-storage-sync-cancel]');
         const radioInputs = overlay.querySelectorAll('input[name="sync_direction"]');
-        const downloadFieldsEl = overlay.querySelector('[data-storage-download-fields]');
-        const remotePathInput = overlay.querySelector('[data-storage-remote-path]');
-        const categorySelect = overlay.querySelector('[data-storage-category]');
-        const subdirInput = overlay.querySelector('[data-storage-subdir]');
-        const fileNameInput = overlay.querySelector('[data-storage-file-name]');
         let resolver = null;
+        let currentDefaultRemotePath = '';
 
-        const needsBaiduDownload = (direction) => direction === 'to_backend' || direction === 'both';
+        const needsBaiduDownload = (direction) => direction === 'to_backend';
 
         const getSelectedDirection = () => {
             const checked = overlay.querySelector('input[name="sync_direction"]:checked');
             return checked ? String(checked.value || '').trim() : '';
-        };
-
-        const updateDownloadFieldsVisibility = (direction = '') => {
-            const shouldShow = needsBaiduDownload(direction);
-            if (downloadFieldsEl) {
-                downloadFieldsEl.hidden = !shouldShow;
-            }
-            if (remotePathInput) {
-                remotePathInput.required = shouldShow;
-            }
         };
 
         const closeModal = (value = null) => {
@@ -1395,16 +1583,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (formEl) {
             formEl.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const formData = new FormData(formEl);
-                const direction = String(formData.get('sync_direction') || '').trim();
+                const direction = getSelectedDirection();
                 if (!direction) return;
 
                 const requiresDownload = needsBaiduDownload(direction);
-                const remotePath = String(formData.get('remote_path') || '').trim();
+                const remotePath = String(currentDefaultRemotePath || '').trim();
                 if (requiresDownload && !remotePath) {
-                    if (remotePathInput) {
-                        remotePathInput.reportValidity();
-                    }
+                    window.alert('当前模型缺少网盘路径，无法同步到本地。');
                     return;
                 }
 
@@ -1412,20 +1597,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     direction,
                     download: requiresDownload ? {
                         remotePath,
-                        category: String(formData.get('category') || 'weights').trim() || 'weights',
-                        subdir: String(formData.get('subdir') || '').trim(),
-                        fileName: String(formData.get('file_name') || '').trim(),
+                        category: 'weights',
                     } : null,
                 };
                 closeModal(result);
             });
         }
-
-        radioInputs.forEach((radio) => {
-            radio.addEventListener('change', () => {
-                updateDownloadFieldsVisibility(getSelectedDirection());
-            });
-        });
 
         cancelBtns.forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -1454,9 +1631,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentStorageServers = [],
                 defaultDirection = '',
                 defaultRemotePath = '',
-                defaultCategory = 'weights',
-                defaultSubdir = 'sync',
-                defaultFileName = '',
             } = {}) {
                 const safeTitle = String(title || '存储同步').trim() || '存储同步';
                 titleEl.textContent = safeTitle;
@@ -1468,31 +1642,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentEl.textContent = `当前存储标记：${serverText}`;
 
                 const candidate = String(defaultDirection || '').trim();
-                const fallback = normalizedServers.includes('backend') && !normalizedServers.includes(BAIDU_STORAGE_SERVER_CANONICAL)
-                    ? 'to_baidu'
-                    : (!normalizedServers.includes('backend') && normalizedServers.includes(BAIDU_STORAGE_SERVER_CANONICAL) ? 'to_backend' : 'both');
+                const fallback = normalizedServers.includes(BAIDU_STORAGE_SERVER_CANONICAL) ? 'to_backend' : 'to_baidu';
                 const selectedDirection = candidate || fallback;
                 radioInputs.forEach((radio) => {
                     radio.checked = radio.value === selectedDirection;
                 });
-                updateDownloadFieldsVisibility(selectedDirection);
-
-                if (remotePathInput) {
-                    remotePathInput.value = String(defaultRemotePath || '').trim();
-                }
-                if (categorySelect) {
-                    const safeCategory = String(defaultCategory || 'weights').trim() || 'weights';
-                    categorySelect.value = safeCategory;
-                    if (categorySelect.value !== safeCategory) {
-                        categorySelect.value = 'weights';
-                    }
-                }
-                if (subdirInput) {
-                    subdirInput.value = String(defaultSubdir || '').trim();
-                }
-                if (fileNameInput) {
-                    fileNameInput.value = String(defaultFileName || '').trim();
-                }
+                currentDefaultRemotePath = String(defaultRemotePath || '').trim();
 
                 overlay.hidden = false;
                 return new Promise((resolve) => {
@@ -1506,8 +1661,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to load page content
     async function loadPage(pageName) {
+        const safePageName = normalizeDashboardPageName(pageName);
+        if (!safePageName) return;
+
         try {
-            const response = await fetch(`pages/${pageName}.html`);
+            const response = await fetch(`pages/${safePageName}.html`);
             if (!response.ok) throw new Error('Page not found');
             const html = await response.text();
 
@@ -1516,19 +1674,41 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 mainContent.innerHTML = `<section class="page-section active fade-in">${html}</section>`;
                 mainContent.style.opacity = '1';
+                persistCurrentPage(safePageName);
+                updateActiveNavigation(safePageName);
 
-                if (pageName === 'model-management') {
+                if (safePageName === 'model-management') {
                     initModelManagementPage();
                     return;
                 }
 
-                if (pageName === 'dataset-management') {
+                if (safePageName === 'dataset-management') {
                     initDatasetManagementPage();
                     return;
                 }
 
-                if (pageName === 'training-results') {
-                    initTrainingResultsPage();
+                if (safePageName === 'model-validation') {
+                    initTrainingLogPage();
+                    return;
+                }
+
+                if (safePageName === 'baidu-netdisk-binding') {
+                    initBaiduNetdiskBindingPage();
+                    return;
+                }
+
+                if (safePageName === 'video-slicing') {
+                    initVideoSlicingPage();
+                    return;
+                }
+
+                if (safePageName === 'srt-generation') {
+                    initSRTGenerationPage();
+                    return;
+                }
+
+                if (safePageName === 'model-inference') {
+                    initModelInferencePage();
                     return;
                 }
 
@@ -1568,7 +1748,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const modelNameInput = document.querySelector('#model-name');
         const modelVersionInput = document.querySelector('#model-version');
         const modelSizeInput = document.querySelector('#model-size-mb');
-        const modelPathInput = document.querySelector('#model-path');
         const modelImplTypeInput = document.querySelector('#model-impl-type');
         const modelStorageServerSelect = document.querySelector('#model-storage-server');
 
@@ -1807,7 +1986,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <button class="btn-icon" title="属性" data-model-action="properties" data-model-id="${rowId}"><i class="fa-solid fa-circle-info"></i></button>
                                     <button class="btn-icon download" title="下载模型文件" data-model-action="download-file" data-model-id="${rowId}"><i class="fa-solid fa-download"></i></button>
                                     <button class="btn-icon cloud" title="同步存储服务" data-model-action="cloud-sync" data-model-id="${rowId}"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-                                    <button class="btn-icon delete" title="删除（待接入）" data-model-action="delete" data-model-id="${rowId}"><i class="fa-solid fa-trash"></i></button>
+                                    <button class="btn-icon delete" title="删除" data-model-action="delete" data-model-id="${rowId}"><i class="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
                         </td>
@@ -1944,7 +2123,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 applySearch();
             });
         }
-
         if (searchBtn) {
             searchBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -2043,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         ? submitIdRaw
                                         : effectiveId;
                                     if (!Number.isInteger(submitId) || submitId <= 0) {
-                                        throw new Error('未找到有效模型 ID，无法更新。');
+                                        throw new Error('未找到有效模型ID，无法更新。');
                                     }
 
                                     const updatedModel = await apiRequest(`/models/${submitId}`, {
@@ -2086,15 +2264,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         currentModel.storage_server,
                     ]);
                     const modelPath = getModelResolvedPath(currentModel);
-                    const modelWeightName = getModelWeightFileName(currentModel);
                     const syncModal = ensureStorageSyncModal();
                     const syncPlan = await syncModal.open({
                         title: `模型同步 - ${modelName}`,
                         currentStorageServers: currentServers,
                         defaultRemotePath: modelPath,
-                        defaultCategory: 'weights',
-                        defaultSubdir: 'sync',
-                        defaultFileName: modelWeightName || getPathFileName(modelPath),
                     });
                     if (!syncPlan) return;
 
@@ -2104,12 +2278,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const directionToServers = {
                         to_baidu: [BAIDU_STORAGE_SERVER_CANONICAL],
                         to_backend: ['backend'],
-                        both: ['backend', BAIDU_STORAGE_SERVER_CANONICAL],
                     };
                     const plannedServers = uniqueStorageServers(directionToServers[direction] || []);
                     const serversToAdd = plannedServers.filter((value) => !currentServers.includes(value));
 
-                    const needsDownload = direction === 'to_backend' || direction === 'both';
+                    const needsDownload = direction === 'to_backend';
 
                     actionBtn.disabled = true;
                     try {
@@ -2203,7 +2376,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!importModal) return;
             importModal.hidden = false;
             setImportFeedback('');
-            await populateStorageServerSelects(importModal);
+            try {
+                await populateStorageServerSelects(importModal);
+            } catch (error) {
+                setImportFeedback(String(error && error.message || '存储服务加载失败'), 'error');
+            }
             const firstInput = importModal.querySelector('input[name="name"]');
             if (firstInput) firstInput.focus();
         };
@@ -2303,7 +2480,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const requestBaiduUpload = shouldUploadToBaidu(resolvedStorageServer);
                 let baiduUploaded = false;
                 const implType = String(formData.get('impl_type') || '').trim();
-                const storageServers = uniqueStorageServers([resolvedStorageServer]);
+                const storageServers = requestBaiduUpload
+                    ? ['backend']
+                    : uniqueStorageServers([resolvedStorageServer]);
                 const resolvedFramework = resolveModelFramework(
                     implType,
                     selectedModelFile && selectedModelFile.name,
@@ -2380,13 +2559,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    const returnedModelPath = String(
-                        createdModel && (createdModel.model_path || createdModel.saved_path || createdModel.resolved_path || ''),
-                    ).trim();
-                    if (returnedModelPath && modelPathInput) {
-                        modelPathInput.value = returnedModelPath;
-                    }
-
                     let syncWarning = '';
                     const createdModelId = getCreatedEntityId(createdModel);
                     const storageServersForSync = getStorageServersForSync(resolvedStorageServer, {
@@ -2401,7 +2573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             syncWarning = `模型已创建，但存储服务同步失败：${syncError.message}`;
                         }
                     } else {
-                        syncWarning = '模型已创建，但未获取到记录 ID，无法同步存储服务。';
+                        syncWarning = '模型已创建，但未获取到记录ID，无法同步存储服务。';
                     }
 
                     showAlert(messageSlot, syncWarning || '模型导入成功，列表已刷新。', syncWarning ? 'error' : 'info');
@@ -2419,9 +2591,856 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        populateStorageServerSelects(importModal);
+        populateStorageServerSelects(importModal).catch((error) => {
+            showAlert(messageSlot, String(error && error.message || '存储服务加载失败'), 'error');
+        });
         updateSortIndicator();
         fetchModels();
+    }
+
+    // initModelInferencePage wires service connect, healthz probe, and predict actions.
+    function initModelInferencePage() {
+        const connectForm = document.querySelector('[data-inference-connect-form]');
+        const predictForm = document.querySelector('[data-inference-predict-form]');
+        if (!connectForm || !predictForm) return;
+
+        const accessTypeInputs = connectForm.querySelectorAll('input[name="access_type"]');
+        const dockerGroup = connectForm.querySelector('[data-inference-docker-group]');
+        const checkBtn = document.querySelector('[data-inference-check-btn]');
+        const startBtn = document.querySelector('[data-inference-start-btn]');
+        const runBtn = document.querySelector('[data-inference-run-btn]');
+        const connectStatus = document.querySelector('[data-inference-connect-status]');
+        const predictStatus = document.querySelector('[data-inference-predict-status]');
+        const configStatus = document.querySelector('[data-inference-config-status]');
+        const apiBaseLabel = document.querySelector('[data-inference-api-base]');
+        const fileDropzone = document.querySelector('[data-inference-file-dropzone]');
+        const fileInput = document.querySelector('[data-inference-file-input]');
+        const fileHint = document.querySelector('[data-inference-file-hint]');
+        const configSearchInput = document.querySelector('[data-inference-config-search-input]');
+        const configSearchBtn = document.querySelector('[data-inference-config-search-btn]');
+        const configRefreshBtn = document.querySelector('[data-inference-config-refresh-btn]');
+        const configSaveOpenBtn = document.querySelector('[data-inference-config-save-open]');
+        const configTable = document.querySelector('[data-inference-config-table]');
+        const configTbody = configTable ? configTable.querySelector('tbody') : null;
+        const configTotalEl = document.querySelector('[data-inference-config-total]');
+        const configActiveLabel = document.querySelector('[data-inference-config-active-label]');
+        const configModal = document.querySelector('[data-inference-config-modal]');
+        const configModalTitle = document.querySelector('[data-inference-config-modal-title]');
+        const configModalForm = document.querySelector('[data-inference-config-modal-form]');
+        const configModalNameInput = document.querySelector('#inference-config-name');
+        const configModalDescriptionInput = document.querySelector('#inference-config-description');
+        const configModalFeedback = document.querySelector('[data-inference-config-modal-feedback]');
+        const configModalCloseBtns = document.querySelectorAll('[data-inference-config-modal-close]');
+
+        const placeholder = document.querySelector('[data-inference-placeholder]');
+        const output = document.querySelector('[data-inference-output]');
+        const resultBadge = document.querySelector('[data-inference-result-badge]');
+        const previewImage = document.querySelector('[data-inference-preview-image]');
+        const previewCanvas = document.querySelector('[data-inference-preview-canvas]');
+        const baseUrlEl = document.querySelector('[data-inference-result-base-url]');
+        const healthzUrlEl = document.querySelector('[data-inference-result-healthz-url]');
+        const predictUrlEl = document.querySelector('[data-inference-result-predict-url]');
+        const resultCountEl = document.querySelector('[data-inference-result-count]');
+        const resultTbody = document.querySelector('[data-inference-result-tbody]');
+        const rawJsonEl = document.querySelector('[data-inference-raw-json]');
+
+        let selectedFile = null;
+        let previewObjectUrl = '';
+        let configSearchTimer = null;
+        let activeConfigId = 0;
+        let activeConfigName = '';
+        const configState = {
+            keyword: '',
+            rows: [],
+            loading: false,
+        };
+
+        if (apiBaseLabel) {
+            apiBaseLabel.textContent = apiBaseUrl;
+        }
+
+        const revokePreviewUrl = () => {
+            if (!previewObjectUrl) return;
+            URL.revokeObjectURL(previewObjectUrl);
+            previewObjectUrl = '';
+        };
+
+        const clearPreviewCanvas = () => {
+            if (!previewCanvas) return;
+            const ctx = previewCanvas.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, previewCanvas.width || 0, previewCanvas.height || 0);
+        };
+
+        // drawInferenceBoxes draws returned bbox_xyxy rectangles over the preview image.
+        const drawInferenceBoxes = (rows) => {
+            if (!previewImage || !previewCanvas) return;
+            const imageRect = previewImage.getBoundingClientRect();
+            const naturalWidth = Number(previewImage.naturalWidth || 0);
+            const naturalHeight = Number(previewImage.naturalHeight || 0);
+            const displayWidth = Math.round(imageRect.width);
+            const displayHeight = Math.round(imageRect.height);
+            if (!naturalWidth || !naturalHeight || !displayWidth || !displayHeight) {
+                clearPreviewCanvas();
+                return;
+            }
+
+            previewCanvas.width = displayWidth;
+            previewCanvas.height = displayHeight;
+            previewCanvas.style.width = `${displayWidth}px`;
+            previewCanvas.style.height = `${displayHeight}px`;
+
+            const ctx = previewCanvas.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+            const scaleX = displayWidth / naturalWidth;
+            const scaleY = displayHeight / naturalHeight;
+            ctx.lineWidth = 2;
+            ctx.font = '12px JetBrains Mono, monospace';
+            ctx.textBaseline = 'top';
+
+            (Array.isArray(rows) ? rows : []).forEach((item, index) => {
+                const bbox = Array.isArray(item && item.bbox_xyxy) ? item.bbox_xyxy : [];
+                if (bbox.length !== 4) return;
+                const [x1, y1, x2, y2] = bbox.map((value) => Number(value));
+                if (![x1, y1, x2, y2].every((value) => Number.isFinite(value))) return;
+
+                const left = x1 * scaleX;
+                const top = y1 * scaleY;
+                const width = Math.max(0, (x2 - x1) * scaleX);
+                const height = Math.max(0, (y2 - y1) * scaleY);
+                const color = index % 2 === 0 ? '#ff8a3d' : '#1f8a70';
+                const className = String((item && item.class_name) || `class_${item && item.class_id}`);
+                const confidence = Number(item && item.confidence);
+                const label = Number.isFinite(confidence)
+                    ? `${className} ${(confidence * 100).toFixed(1)}%`
+                    : className;
+
+                ctx.strokeStyle = color;
+                ctx.strokeRect(left, top, width, height);
+
+                const textWidth = Math.ceil(ctx.measureText(label).width);
+                const textX = left;
+                const textY = Math.max(0, top - 20);
+                ctx.fillStyle = color;
+                ctx.fillRect(textX, textY, textWidth + 10, 18);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(label, textX + 5, textY + 3);
+            });
+        };
+
+        const getSelectedAccessType = () => {
+            const checked = Array.from(accessTypeInputs).find((input) => input.checked);
+            return String((checked && checked.value) || 'docker').trim();
+        };
+
+        const syncAccessMode = () => {
+            const isDocker = getSelectedAccessType() === 'docker';
+            if (dockerGroup) {
+                dockerGroup.style.display = isDocker ? '' : 'none';
+            }
+            if (startBtn) {
+                startBtn.innerHTML = isDocker
+                    ? '<i class="fa-solid fa-play"></i> 启动并探活'
+                    : '<i class="fa-solid fa-plug-circle-check"></i> 远程探活';
+            }
+        };
+
+        const readConnectPayload = () => {
+            const formData = new FormData(connectForm);
+            return {
+                access_type: String(formData.get('access_type') || '').trim(),
+                base_url: String(formData.get('base_url') || '').trim(),
+                healthz_path: String(formData.get('healthz_path') || '').trim(),
+                predict_path: String(formData.get('predict_path') || '').trim(),
+                docker_command: String(formData.get('docker_command') || '').trim(),
+                startup_timeout_second: Number(formData.get('startup_timeout_second') || 30) || 30,
+            };
+        };
+
+        const setBusy = (elements, busy) => {
+            elements.forEach((element) => {
+                if (element) element.disabled = busy;
+            });
+        };
+
+        const setInlineStatus = (container, message, tone = 'info') => {
+            if (!container) return;
+            if (!message) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `<div class="alert ${tone === 'error' ? 'error' : 'info'}">${escapeHtml(message)}</div>`;
+        };
+
+        // setConfigModalFeedback updates the save-config modal feedback banner.
+        const setConfigModalFeedback = (message, tone = 'info') => {
+            if (!configModalFeedback) return;
+            if (!message) {
+                configModalFeedback.hidden = true;
+                configModalFeedback.className = 'model-import-feedback alert info';
+                configModalFeedback.textContent = '';
+                return;
+            }
+            configModalFeedback.hidden = false;
+            configModalFeedback.className = `model-import-feedback alert ${tone === 'error' ? 'error' : 'info'}`;
+            configModalFeedback.textContent = message;
+        };
+
+        // setConfigActiveLabel renders the currently loaded config name.
+        const setConfigActiveLabel = () => {
+            if (!configActiveLabel) return;
+            if (activeConfigId > 0 && activeConfigName) {
+                configActiveLabel.textContent = `当前已加载配置：${activeConfigName}`;
+                return;
+            }
+            configActiveLabel.textContent = '当前未加载保存配置';
+        };
+
+        // renderConfigPlaceholder renders a placeholder row in the config table.
+        const renderConfigPlaceholder = (message) => {
+            if (!configTbody) return;
+            configTbody.innerHTML = `<tr><td colspan="6" class="table-state">${escapeHtml(message)}</td></tr>`;
+        };
+
+        // collectInferenceConfigPayload collects the current connect and predict form values.
+        const collectInferenceConfigPayload = () => {
+            const connectPayload = readConnectPayload();
+            const predictData = new FormData(predictForm);
+            return {
+                access_type: connectPayload.access_type,
+                base_url: connectPayload.base_url,
+                healthz_path: connectPayload.healthz_path,
+                predict_path: connectPayload.predict_path,
+                docker_command: connectPayload.docker_command,
+                startup_timeout_second: connectPayload.startup_timeout_second,
+                conf: Number(predictData.get('conf') || 0.25) || 0.25,
+                imgsz: Number(predictData.get('imgsz') || 640) || 640,
+                classes: String(predictData.get('classes') || '').trim(),
+            };
+        };
+
+        // applyInferenceConfig writes a saved config back into the current forms.
+        const applyInferenceConfig = (config) => {
+            if (!config || typeof config !== 'object') return;
+            const setValue = (selector, value) => {
+                const input = document.querySelector(selector);
+                if (input) input.value = value == null ? '' : String(value);
+            };
+
+            const nextAccessType = String(config.access_type || 'docker').trim() || 'docker';
+            accessTypeInputs.forEach((input) => {
+                input.checked = input.value === nextAccessType;
+            });
+            syncAccessMode();
+
+            setValue('#inference-base-url', config.base_url);
+            setValue('#inference-docker-command', config.docker_command);
+            setValue('#inference-healthz-path', config.healthz_path);
+            setValue('#inference-predict-path', config.predict_path);
+            setValue('#inference-startup-timeout', config.startup_timeout_second);
+            setValue('#inference-conf', config.conf);
+            setValue('#inference-imgsz', config.imgsz);
+            setValue('#inference-classes', config.classes);
+
+            activeConfigId = Number(config.id) || 0;
+            activeConfigName = String(config.name || '').trim();
+            setConfigActiveLabel();
+            setInlineStatus(configStatus, `已加载配置：${activeConfigName || '未命名推理配置'}`, 'info');
+        };
+
+        // renderConfigRows renders the saved inference config table.
+        const renderConfigRows = () => {
+            if (!configTbody) return;
+            if (!Array.isArray(configState.rows) || configState.rows.length === 0) {
+                renderConfigPlaceholder('暂无保存的推理配置');
+                if (configTotalEl) configTotalEl.textContent = '0';
+                return;
+            }
+
+            configTbody.innerHTML = configState.rows.map((item) => {
+                const id = Number(item && item.id) || 0;
+                const isActive = id > 0 && id === activeConfigId;
+                const detail = escapeHtml(encodeURIComponent(JSON.stringify(item || {})));
+                const name = escapeHtml(item && item.name || '--');
+                const accessType = escapeHtml(item && item.access_type || '--');
+                const baseUrl = escapeHtml(item && item.base_url || '--');
+                const paramsText = escapeHtml(`conf=${item && item.conf != null ? item.conf : '--'}｜imgsz=${item && item.imgsz != null ? item.imgsz : '--'}｜classes=${item && item.classes ? item.classes : '--'}`);
+                const updatedAt = escapeHtml(formatDateTime(item && item.updated_at));
+                return `
+                    <tr${isActive ? ' class="is-active-config-row"' : ''}>
+                        <td>
+                            <div class="config-name-cell">
+                                <strong>${name}</strong>
+                                <span>${escapeHtml(item && item.description || '')}</span>
+                            </div>
+                        </td>
+                        <td>${accessType}</td>
+                        <td>${baseUrl}</td>
+                        <td>${paramsText}</td>
+                        <td>${updatedAt}</td>
+                        <td>
+                            <div class="table-inline-actions">
+                                <button class="btn btn-secondary btn-sm" type="button" data-inference-config-action="load" data-inference-config-detail="${detail}">加载</button>
+                                <button class="btn btn-secondary btn-sm" type="button" data-inference-config-action="delete" data-inference-config-id="${id}" data-inference-config-name="${name}">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            if (configTotalEl) configTotalEl.textContent = String(configState.rows.length);
+        };
+
+        // openConfigModal opens the save-config modal in create or update mode.
+        const openConfigModal = () => {
+            if (!configModal) return;
+            configModal.hidden = false;
+            setConfigModalFeedback('');
+            if (configModalForm) configModalForm.reset();
+            const activeConfig = configState.rows.find((item) => Number(item && item.id) === activeConfigId);
+            if (activeConfig) {
+                if (configModalNameInput) configModalNameInput.value = String(activeConfig.name || '').trim();
+                if (configModalDescriptionInput) configModalDescriptionInput.value = String(activeConfig.description || '').trim();
+            }
+            if (configModalTitle) {
+                configModalTitle.textContent = activeConfigId > 0 ? '更新推理配置' : '保存推理配置';
+            }
+            if (configModalNameInput) configModalNameInput.focus();
+        };
+
+        // closeConfigModal closes and resets the save-config modal.
+        const closeConfigModal = () => {
+            if (!configModal) return;
+            configModal.hidden = true;
+            if (configModalForm) configModalForm.reset();
+            setConfigModalFeedback('');
+        };
+
+        // fetchInferenceConfigs loads saved configs from the backend.
+        const fetchInferenceConfigs = async () => {
+            configState.loading = true;
+            renderConfigPlaceholder('推理配置加载中...');
+            try {
+                const data = await apiRequest('/inference/configs', {
+                    query: {
+                        page: 1,
+                        page_size: 50,
+                        keyword: configState.keyword,
+                    },
+                });
+                configState.rows = Array.isArray(data && data.list) ? data.list : [];
+                renderConfigRows();
+            } catch (error) {
+                configState.rows = [];
+                renderConfigPlaceholder('推理配置加载失败');
+                setInlineStatus(configStatus, `加载推理配置失败: ${error.message}`, 'error');
+            } finally {
+                configState.loading = false;
+            }
+        };
+
+        const renderResultRows = (rows) => {
+            if (!resultTbody) return;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                resultTbody.innerHTML = '<tr><td colspan="4" class="table-state">未返回检测结果</td></tr>';
+                return;
+            }
+            resultTbody.innerHTML = rows.map((item) => {
+                const bbox = Array.isArray(item && item.bbox_xyxy)
+                    ? item.bbox_xyxy.map((value) => Number(value).toFixed(2)).join(', ')
+                    : '--';
+                const confidence = Number(item && item.confidence);
+                return `
+                    <tr>
+                        <td>${escapeHtml(item && item.class_id)}</td>
+                        <td>${escapeHtml(item && item.class_name)}</td>
+                        <td>${Number.isFinite(confidence) ? confidence.toFixed(6) : '--'}</td>
+                        <td>${escapeHtml(bbox)}</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        const fillResultSummary = (serviceInfo, rows) => {
+            const currentPayload = readConnectPayload();
+            if (baseUrlEl) baseUrlEl.textContent = (serviceInfo && serviceInfo.base_url) || '--';
+            if (healthzUrlEl) {
+                healthzUrlEl.textContent = `${((serviceInfo && serviceInfo.base_url) || currentPayload.base_url || '--')}${String(currentPayload.healthz_path || '/healthz')}`;
+            }
+            if (predictUrlEl) predictUrlEl.textContent = (serviceInfo && serviceInfo.predict_url) || '--';
+            if (resultCountEl) resultCountEl.textContent = String(Array.isArray(rows) ? rows.length : 0);
+        };
+
+        const showResultState = (statusText, badgeClass = 'secondary') => {
+            if (resultBadge) {
+                resultBadge.textContent = statusText;
+                resultBadge.className = `badge ${badgeClass}`;
+            }
+        };
+
+        const runConnect = async () => {
+            setInlineStatus(connectStatus, '正在校验推理服务...', 'info');
+            setBusy([checkBtn, startBtn, runBtn], true);
+            try {
+                const data = await apiRequest('/inference/connect', {
+                    method: 'POST',
+                    body: readConnectPayload(),
+                });
+                showResultState('已连接', 'success');
+                setInlineStatus(connectStatus, String((data && data.message) || '推理服务连接成功'), 'info');
+                fillResultSummary(data, []);
+                return data;
+            } catch (error) {
+                showResultState('连接失败', 'error');
+                setInlineStatus(connectStatus, error.message || '推理服务连接失败', 'error');
+                throw error;
+            } finally {
+                setBusy([checkBtn, startBtn, runBtn], false);
+            }
+        };
+
+        accessTypeInputs.forEach((input) => input.addEventListener('change', syncAccessMode));
+        syncAccessMode();
+
+        setupDropzone({
+            zone: fileDropzone,
+            fileInput,
+            hintEl: fileHint,
+            defaultHint: '点击上传待推理图片，或拖拽到这里',
+            onFile: (file) => {
+                selectedFile = file;
+                revokePreviewUrl();
+                clearPreviewCanvas();
+                previewObjectUrl = URL.createObjectURL(file);
+                if (previewImage) {
+                    previewImage.src = previewObjectUrl;
+                }
+            },
+        });
+
+        if (previewImage) {
+            previewImage.addEventListener('load', () => {
+                clearPreviewCanvas();
+            });
+        }
+
+        if (checkBtn) {
+            checkBtn.addEventListener('click', async () => {
+                await runConnect();
+            });
+        }
+
+        if (startBtn) {
+            startBtn.addEventListener('click', async () => {
+                await runConnect();
+            });
+        }
+
+        if (configSearchInput) {
+            configSearchInput.addEventListener('input', () => {
+                clearTimeout(configSearchTimer);
+                configSearchTimer = setTimeout(() => {
+                    configState.keyword = String(configSearchInput.value || '').trim();
+                    fetchInferenceConfigs();
+                }, 300);
+            });
+        }
+
+        if (configSearchBtn) {
+            configSearchBtn.addEventListener('click', () => {
+                configState.keyword = String(configSearchInput && configSearchInput.value || '').trim();
+                fetchInferenceConfigs();
+            });
+        }
+
+        if (configRefreshBtn) {
+            configRefreshBtn.addEventListener('click', () => {
+                fetchInferenceConfigs();
+            });
+        }
+
+        if (configSaveOpenBtn) {
+            configSaveOpenBtn.addEventListener('click', openConfigModal);
+        }
+
+        configModalCloseBtns.forEach((btn) => {
+            btn.addEventListener('click', closeConfigModal);
+        });
+
+        if (configModal) {
+            configModal.addEventListener('click', (event) => {
+                if (event.target === configModal) {
+                    closeConfigModal();
+                }
+            });
+        }
+
+        if (configModalForm) {
+            configModalForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!configModalForm.checkValidity()) {
+                    configModalForm.reportValidity();
+                    return;
+                }
+
+                const submitBtn = configModalForm.querySelector('[data-inference-config-modal-submit]');
+                const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
+                const payload = collectInferenceConfigPayload();
+                payload.name = String(configModalNameInput && configModalNameInput.value || '').trim();
+                payload.description = String(configModalDescriptionInput && configModalDescriptionInput.value || '').trim();
+
+                try {
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中';
+                    }
+                    setConfigModalFeedback('正在保存推理配置...', 'info');
+                    const result = await apiRequest(
+                        activeConfigId > 0 ? `/inference/configs/${activeConfigId}` : '/inference/configs',
+                        {
+                            method: activeConfigId > 0 ? 'PATCH' : 'POST',
+                            body: payload,
+                        },
+                    );
+                    activeConfigId = Number(result && result.id) || 0;
+                    activeConfigName = String(result && result.name || payload.name || '').trim();
+                    setConfigActiveLabel();
+                    setInlineStatus(configStatus, `推理配置已保存：${activeConfigName || '未命名推理配置'}`, 'info');
+                    closeConfigModal();
+                    await fetchInferenceConfigs();
+                } catch (error) {
+                    setConfigModalFeedback(`保存失败: ${error.message}`, 'error');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalSubmitText;
+                    }
+                }
+            });
+        }
+
+        predictForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!(selectedFile instanceof File)) {
+                setInlineStatus(predictStatus, '请先上传待推理图片', 'error');
+                return;
+            }
+
+            setBusy([checkBtn, startBtn, runBtn], true);
+            setInlineStatus(predictStatus, '正在执行真实推理，请稍候...', 'info');
+            showResultState('推理中', 'processing');
+
+            const connectPayload = readConnectPayload();
+            const formData = new FormData(predictForm);
+            formData.append('file', selectedFile, selectedFile.name);
+            Object.entries(connectPayload).forEach(([key, value]) => {
+                formData.append(key, value == null ? '' : String(value));
+            });
+
+            try {
+                const data = await apiRequest('/inference/predict', {
+                    method: 'POST',
+                    formData,
+                });
+                const rows = Array.isArray(data && data.result) ? data.result : [];
+                if (placeholder) placeholder.hidden = true;
+                if (output) output.hidden = false;
+                renderResultRows(rows);
+                fillResultSummary(data && data.service, rows);
+                drawInferenceBoxes(rows);
+                if (rawJsonEl) {
+                    rawJsonEl.textContent = JSON.stringify(rows, null, 2);
+                }
+                showResultState('推理完成', rows.length ? 'success' : 'secondary');
+                setInlineStatus(predictStatus, String((data && data.message) || '推理完成'), 'info');
+            } catch (error) {
+                if (placeholder) placeholder.hidden = false;
+                if (output) output.hidden = true;
+                clearPreviewCanvas();
+                showResultState('推理失败', 'error');
+                setInlineStatus(predictStatus, error.message || '推理失败', 'error');
+            } finally {
+                setBusy([checkBtn, startBtn, runBtn], false);
+            }
+        });
+
+        if (configTbody) {
+            configTbody.addEventListener('click', async (event) => {
+                const actionBtn = event.target.closest('[data-inference-config-action]');
+                if (!actionBtn) return;
+
+                const action = String(actionBtn.dataset.inferenceConfigAction || '').trim();
+                if (action === 'load') {
+                    const raw = decodePayloadValue(actionBtn.dataset.inferenceConfigDetail);
+                    let detail = {};
+                    try {
+                        detail = raw ? JSON.parse(raw) : {};
+                    } catch (error) {
+                        detail = {};
+                    }
+                    applyInferenceConfig(detail);
+                    return;
+                }
+
+                if (action === 'delete') {
+                    const id = Number(actionBtn.dataset.inferenceConfigId);
+                    const name = decodePayloadValue(actionBtn.dataset.inferenceConfigName) || '该配置';
+                    if (!Number.isInteger(id) || id <= 0) {
+                        setInlineStatus(configStatus, '无效的推理配置 ID', 'error');
+                        return;
+                    }
+                    if (!window.confirm(`确认删除推理配置“${name}”吗？`)) {
+                        return;
+                    }
+                    try {
+                        await apiRequest(`/inference/configs/${id}`, {
+                            method: 'DELETE',
+                        });
+                        if (id === activeConfigId) {
+                            activeConfigId = 0;
+                            activeConfigName = '';
+                            setConfigActiveLabel();
+                        }
+                        setInlineStatus(configStatus, `已删除推理配置：${name}`, 'info');
+                        await fetchInferenceConfigs();
+                    } catch (error) {
+                        setInlineStatus(configStatus, `删除推理配置失败: ${error.message}`, 'error');
+                    }
+                }
+            });
+        }
+
+        setConfigActiveLabel();
+        fetchInferenceConfigs();
+    }
+
+    // initBaiduNetdiskBindingPage wires the authorization-code binding form and result view.
+    function initBaiduNetdiskBindingPage() {
+        const form = document.querySelector('[data-baidu-bind-form]');
+        if (!form) return;
+
+        const feedbackEl = document.querySelector('[data-baidu-bind-feedback]');
+        const resultEl = document.querySelector('[data-baidu-bind-result]');
+        const summaryEl = document.querySelector('[data-baidu-bind-result-summary]');
+        const filePanelEl = document.querySelector('[data-baidu-bind-file-panel]');
+        const fileListEl = document.querySelector('[data-baidu-bind-file-list]');
+        const submitBtn = document.querySelector('[data-baidu-bind-submit]');
+        const endpointLabelEl = document.querySelector('[data-baidu-bind-endpoint-label]');
+        const docLinkEl = document.querySelector('a[href="https://pan.baidu.com/union/doc/6l0ryrjzv"]');
+
+        if (endpointLabelEl) {
+            endpointLabelEl.textContent = baiduOAuthBindEndpoint;
+        }
+        if (docLinkEl) {
+            docLinkEl.href = baiduOAuthDocUrl;
+        }
+
+        // setBindingFeedback updates the bind status message area.
+        const setBindingFeedback = (message, tone = 'info') => {
+            if (!feedbackEl) return;
+            if (!message) {
+                feedbackEl.hidden = true;
+                feedbackEl.className = 'model-import-feedback alert info';
+                feedbackEl.textContent = '';
+                return;
+            }
+            feedbackEl.hidden = false;
+            feedbackEl.className = `model-import-feedback alert ${tone === 'error' ? 'error' : 'info'}`;
+            feedbackEl.textContent = message;
+        };
+
+        // extractDirectoryFiles pulls a file list from common backend response shapes.
+        const extractDirectoryFiles = (value) => {
+            if (!value || typeof value !== 'object') return [];
+
+            const candidates = [
+                value.files,
+                value.directory_files,
+                value.items,
+                value.list,
+                value.data && value.data.files,
+                value.data && value.data.directory_files,
+                value.data && value.data.items,
+                value.data && value.data.list,
+            ];
+
+            for (let i = 0; i < candidates.length; i += 1) {
+                if (Array.isArray(candidates[i])) {
+                    return candidates[i];
+                }
+            }
+
+            return [];
+        };
+
+        // extractDirectoryPath pulls the configured/current directory path from common response shapes.
+        const extractDirectoryPath = (value) => {
+            if (!value || typeof value !== 'object') return '';
+
+            const candidates = [
+                value.directory,
+                value.dir,
+                value.path,
+                value.current_directory,
+                value.configured_directory,
+                value.baidu_directory,
+                value.storage_path,
+                value.data && value.data.directory,
+                value.data && value.data.dir,
+                value.data && value.data.path,
+                value.data && value.data.current_directory,
+                value.data && value.data.configured_directory,
+                value.data && value.data.baidu_directory,
+                value.data && value.data.storage_path,
+            ];
+
+            for (let i = 0; i < candidates.length; i += 1) {
+                const candidate = String(candidates[i] || '').trim();
+                if (candidate) return candidate;
+            }
+
+            return '';
+        };
+
+        // renderDirectoryResult shows the current configured directory and file list without refreshing the page.
+        const renderDirectoryResult = (value) => {
+            if (!summaryEl || !filePanelEl || !fileListEl) return;
+
+            const directoryPath = extractDirectoryPath(value);
+            const files = extractDirectoryFiles(value);
+
+            if (!directoryPath && files.length === 0) {
+                summaryEl.hidden = true;
+                summaryEl.innerHTML = '';
+                filePanelEl.hidden = true;
+                fileListEl.innerHTML = '';
+                return;
+            }
+
+            const summaryItems = [];
+            if (directoryPath) {
+                summaryItems.push(`
+                    <div class="property-item">
+                        <span class="property-label">当前配置目录</span>
+                        <code class="property-value">${escapeHtml(directoryPath)}</code>
+                    </div>
+                `);
+            }
+            summaryItems.push(`
+                <div class="property-item">
+                    <span class="property-label">文件数量</span>
+                    <span class="property-value">${files.length}</span>
+                </div>
+            `);
+            summaryEl.innerHTML = summaryItems.join('');
+            summaryEl.hidden = false;
+
+            if (!files.length) {
+                filePanelEl.hidden = true;
+                fileListEl.innerHTML = '';
+                return;
+            }
+
+            fileListEl.innerHTML = files.map((file) => {
+                if (file && typeof file === 'object') {
+                    const name = String(
+                        file.name || file.filename || file.file_name || file.path || file.fs_id || JSON.stringify(file),
+                    ).trim();
+                    const size = file.size != null ? ` (${escapeHtml(formatFileSize(file.size))})` : '';
+                    return `<li><code>${escapeHtml(name || '--')}</code>${size}</li>`;
+                }
+                return `<li><code>${escapeHtml(String(file))}</code></li>`;
+            }).join('');
+            filePanelEl.hidden = false;
+        };
+
+        // setBindingResult writes the latest backend response into the result panel.
+        const setBindingResult = (value) => {
+            if (!resultEl) return;
+            if (value == null || value === '') {
+                resultEl.textContent = '等待提交凭证...';
+                renderDirectoryResult(null);
+                return;
+            }
+            if (typeof value === 'string') {
+                resultEl.textContent = value;
+                renderDirectoryResult(null);
+                return;
+            }
+            resultEl.textContent = JSON.stringify(value, null, 2);
+            renderDirectoryResult(value);
+        };
+
+        // parseBaiduTokenCredential normalizes a raw token credential string into a POST payload.
+        const parseBaiduTokenCredential = (rawCredential) => {
+            const raw = String(rawCredential || '').trim();
+            if (!raw) {
+                throw new Error('请输入百度 Access Token 凭证。');
+            }
+
+            const payload = {
+                credential: raw,
+                raw_credential: raw,
+            };
+
+            try {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                    const accessToken = String(parsed.access_token || '').trim();
+                    const refreshToken = String(parsed.refresh_token || '').trim();
+                    const scope = String(parsed.scope || '').trim();
+                    const sessionKey = String(parsed.session_key || '').trim();
+                    const sessionSecret = String(parsed.session_secret || '').trim();
+                    const expiresIn = Number(parsed.expires_in);
+
+                    payload.credential = parsed;
+                    if (accessToken) payload.access_token = accessToken;
+                    if (refreshToken) payload.refresh_token = refreshToken;
+                    if (scope) payload.scope = scope;
+                    if (sessionKey) payload.session_key = sessionKey;
+                    if (sessionSecret) payload.session_secret = sessionSecret;
+                    if (Number.isFinite(expiresIn) && expiresIn >= 0) payload.expires_in = expiresIn;
+                    return payload;
+                }
+            } catch (error) {
+                // Treat non-JSON input as a plain access_token string.
+            }
+
+            payload.access_token = raw;
+            return payload;
+        };
+
+        setBindingFeedback('');
+        setBindingResult('');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const payload = parseBaiduTokenCredential(formData.get('credential'));
+
+            submitBtn.disabled = true;
+            setBindingFeedback('正在上传百度 Access Token 凭证...', 'info');
+
+            try {
+                const result = await apiRequest(baiduOAuthBindEndpoint, {
+                    method: 'POST',
+                    body: payload,
+                });
+                setBindingResult(result);
+                setBindingFeedback('百度网盘凭证上传成功，请核对后端返回结果。', 'info');
+            } catch (error) {
+                setBindingResult(error && error.responseData ? error.responseData : String(error && error.message || '请求失败'));
+                setBindingFeedback(`上传失败：${error.message}`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
     }
 
     function initDatasetManagementPage() {
@@ -2467,7 +3486,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!uploadModal) return;
             uploadModal.hidden = false;
             setFeedback('');
-            await populateStorageServerSelects(uploadModal);
+            try {
+                await populateStorageServerSelects(uploadModal);
+            } catch (error) {
+                setFeedback(String(error && error.message || '存储服务加载失败'), 'error');
+            }
             if (datasetNameInput) datasetNameInput.focus();
         };
 
@@ -2578,7 +3601,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const resolvedId = Number(matched && matched.id);
             if (!Number.isInteger(resolvedId) || resolvedId <= 0) {
-                throw new Error('未解析到有效数据集 ID。');
+                throw new Error('未解析到有效数据集ID。');
             }
 
             return matched;
@@ -2769,7 +3792,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             syncWarning = `数据集已创建，但存储服务同步失败：${syncError.message}`;
                         }
                     } else {
-                        syncWarning = '数据集已创建，但未获取到记录 ID，无法同步存储服务。';
+                        syncWarning = '数据集已创建，但未获取到记录ID，无法同步存储服务。';
                     }
 
                     showAlert(messageSlot, syncWarning || '数据集元数据上传成功。可继续在列表中管理。', syncWarning ? 'error' : 'info');
@@ -2785,227 +3808,160 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        populateStorageServerSelects(uploadModal);
+        populateStorageServerSelects(uploadModal).catch((error) => {
+            showAlert(messageSlot, String(error && error.message || '存储服务加载失败'), 'error');
+        });
         initTableFeatures();
     }
 
-    function initTrainingResultsPage() {
-        const table = document.querySelector('[data-training-table]');
+    function initVideoSlicingPage() {
+        const table = document.querySelector('[data-video-table]');
         if (!table) return;
 
         const tbody = table.querySelector('tbody');
-        const searchInput = document.querySelector('[data-training-search-input]');
-        const searchBtn = document.querySelector('[data-training-search-btn]');
-        const modelIdInput = document.querySelector('[data-training-filter-model-id]');
-        const datasetIdInput = document.querySelector('[data-training-filter-dataset-id]');
-        const statusSelect = document.querySelector('[data-training-filter-status]');
-        const resetBtn = document.querySelector('[data-training-filter-reset]');
-        const refreshBtn = document.querySelector('[data-training-refresh-btn]');
-        const pageSizeSelect = document.querySelector('[data-training-page-size]');
-        const totalItemsSpan = document.querySelector('[data-training-total-items]');
-        const paginationControls = document.querySelector('[data-training-pagination]');
-        const messageSlot = document.querySelector('[data-training-message]');
-        const apiBaseLabel = document.querySelector('[data-training-api-base]');
+        const searchInput = document.querySelector('[data-video-search-input]');
+        const searchBtn = document.querySelector('[data-video-search-btn]');
+        const refreshBtn = document.querySelector('[data-video-refresh-btn]');
+        const uploadOpenBtn = document.querySelector('[data-video-upload-open]');
+        const pageSizeSelect = document.querySelector('[data-video-page-size]');
+        const totalItemsEl = document.querySelector('[data-video-total-items]');
+        const paginationControls = document.querySelector('[data-video-pagination]');
+        const messageSlot = document.querySelector('[data-video-message]');
 
-        if (apiBaseLabel) {
-            apiBaseLabel.textContent = apiBaseUrl;
-        }
+        const uploadModal = document.querySelector('[data-video-upload-modal]');
+        const uploadCloseBtns = document.querySelectorAll('[data-video-upload-close]');
+        const uploadForm = document.querySelector('[data-video-upload-form]');
+        const uploadFeedback = document.querySelector('[data-video-upload-feedback]');
+        const videoFileDropzone = document.querySelector('[data-video-file-dropzone]');
+        const videoFileInput = document.querySelector('[data-video-file-input]');
+        const videoFileHint = document.querySelector('[data-video-file-hint]');
+        const videoNameInput = document.querySelector('#video-name');
+        const videoFileNameInput = document.querySelector('#video-file-name');
+
+        const previewModal = document.querySelector('[data-video-preview-modal]');
+        const previewCloseBtns = document.querySelectorAll('[data-video-preview-close]');
+        const previewTitle = document.querySelector('[data-video-preview-title]');
+        const previewMeta = document.querySelector('[data-video-preview-meta]');
+        const previewPlayer = document.querySelector('[data-video-preview-player]');
+        const sliceModal = document.querySelector('[data-video-slice-modal]');
+        const sliceCloseBtns = document.querySelectorAll('[data-video-slice-close]');
+        const sliceTitle = document.querySelector('[data-video-slice-title]');
+        const sliceForm = document.querySelector('[data-video-slice-form]');
+        const sliceFeedback = document.querySelector('[data-video-slice-feedback]');
+        const sliceDurationInput = document.querySelector('#video-slice-duration');
+        const sliceResults = document.querySelector('[data-video-slice-results]');
+        const sliceResultsMeta = document.querySelector('[data-video-slice-results-meta]');
+        const sliceResultList = document.querySelector('[data-video-slice-result-list]');
+        const frameCollections = document.querySelector('[data-video-frame-collections]');
+        const frameCollectionsMeta = document.querySelector('[data-video-frame-collections-meta]');
+        const frameCollectionsList = document.querySelector('[data-video-frame-collections-list]');
 
         const state = {
             page: 1,
             pageSize: Number(pageSizeSelect && pageSizeSelect.value) || 10,
             keyword: '',
-            modelId: null,
-            datasetId: null,
-            status: '',
             total: 0,
             rows: [],
             loading: false,
         };
+
         let searchTimer = null;
+        let selectedVideoFile = null;
+        let activeSliceVideo = null;
+        const defaultFileHint = '支持 mp4 / mov / mkv / avi / mpeg / webm';
 
         const setLoadingState = (loading) => {
             state.loading = loading;
-            [
-                searchInput,
-                searchBtn,
-                modelIdInput,
-                datasetIdInput,
-                statusSelect,
-                resetBtn,
-                refreshBtn,
-                pageSizeSelect,
-            ].forEach((el) => {
+            [searchInput, searchBtn, refreshBtn, uploadOpenBtn, pageSizeSelect].forEach((el) => {
                 if (el) el.disabled = loading;
             });
         };
 
         const renderPlaceholderRow = (message) => {
-            tbody.innerHTML = `<tr><td colspan="7" class="table-state">${escapeHtml(message)}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="table-state">${escapeHtml(message)}</td></tr>`;
         };
 
-        const parsePositiveInteger = (raw) => {
-            const num = Number(raw);
-            if (!Number.isInteger(num) || num <= 0) return null;
-            return num;
+        const setUploadFeedback = (message, tone = 'info') => {
+            if (!uploadFeedback) return;
+            if (!message) {
+                uploadFeedback.hidden = true;
+                uploadFeedback.className = 'model-import-feedback alert info';
+                uploadFeedback.textContent = '';
+                return;
+            }
+            uploadFeedback.hidden = false;
+            uploadFeedback.className = `model-import-feedback alert ${tone === 'error' ? 'error' : 'info'}`;
+            uploadFeedback.textContent = message;
         };
 
-        const parseMetricDetail = (metricDetail) => {
-            if (metricDetail && typeof metricDetail === 'object') return metricDetail;
-            if (typeof metricDetail !== 'string') return null;
-            const trimmed = metricDetail.trim();
-            if (!trimmed) return null;
-            try {
-                const parsed = JSON.parse(trimmed);
-                return parsed && typeof parsed === 'object' ? parsed : null;
-            } catch (error) {
-                return null;
+        // setSliceFeedback updates the frame capture modal feedback banner.
+        const setSliceFeedback = (message, tone = 'info') => {
+            if (!sliceFeedback) return;
+            if (!message) {
+                sliceFeedback.hidden = true;
+                sliceFeedback.className = 'model-import-feedback alert info';
+                sliceFeedback.textContent = '';
+                return;
             }
-        };
-
-        const formatMetricValue = (value) => {
-            const num = Number(value);
-            if (Number.isFinite(num)) {
-                const precision = Math.abs(num) >= 1 ? 3 : 4;
-                return num.toFixed(precision).replace(/\.?0+$/, '');
-            }
-            return String(value);
-        };
-
-        const buildMetricTags = (item) => {
-            const detail = parseMetricDetail(item && (item.metric_detail || item.metricDetail || item.metrics));
-            if (!detail) return [];
-            return Object.entries(detail)
-                .filter(([key, val]) => key && val != null && val !== '')
-                .slice(0, 4)
-                .map(([key, val]) => `${key}: ${formatMetricValue(val)}`);
-        };
-
-        const getTrainingStatusMeta = (statusValue) => {
-            const num = Number(statusValue);
-            if (Number.isFinite(num)) {
-                const code = Math.trunc(num);
-                if (code === 0) return { cls: 'warning', text: '待开始' };
-                if (code === 1) return { cls: 'processing', text: '训练中' };
-                if (code === 2) return { cls: 'success', text: '成功' };
-                if (code === 3) return { cls: 'error', text: '失败' };
-                if (code === 4) return { cls: 'warning', text: '已中断' };
-            }
-
-            const normalized = String(statusValue == null ? '' : statusValue).trim().toLowerCase();
-            if (!normalized) return { cls: 'secondary', text: '未知' };
-            if (normalized.includes('success') || normalized.includes('completed') || normalized.includes('成功')) {
-                return { cls: 'success', text: '成功' };
-            }
-            if (normalized.includes('running') || normalized.includes('processing') || normalized.includes('训练中')) {
-                return { cls: 'processing', text: '训练中' };
-            }
-            if (normalized.includes('fail') || normalized.includes('error') || normalized.includes('失败')) {
-                return { cls: 'error', text: '失败' };
-            }
-            if (normalized.includes('interrupt') || normalized.includes('stopped') || normalized.includes('中断')) {
-                return { cls: 'warning', text: '已中断' };
-            }
-            return { cls: 'secondary', text: String(statusValue) };
-        };
-
-        const truncateMiddle = (text, maxLength = 54) => {
-            const str = String(text || '');
-            if (str.length <= maxLength) return str;
-            const keep = Math.max(8, Math.floor((maxLength - 3) / 2));
-            return `${str.slice(0, keep)}...${str.slice(-keep)}`;
+            sliceFeedback.hidden = false;
+            sliceFeedback.className = `model-import-feedback alert ${tone === 'error' ? 'error' : 'info'}`;
+            sliceFeedback.textContent = message;
         };
 
         const renderRows = () => {
             if (!Array.isArray(state.rows) || state.rows.length === 0) {
-                renderPlaceholderRow('暂无训练结果');
+                renderPlaceholderRow('暂无视频数据');
                 return;
             }
 
-            const html = state.rows.map((item) => {
-                const taskIdRaw = item.id ?? item.training_id ?? item.task_id ?? '--';
-                const modelIdRaw = item.model_id ?? item.training_model_id ?? '--';
-                const datasetIdRaw = item.dataset_id ?? item.training_dataset_id ?? '--';
-                const datasetVersionRaw = item.dataset_version ?? item.dataset_ver ?? '--';
-                const status = getTrainingStatusMeta(item.training_status ?? item.status);
-                const metricTags = buildMetricTags(item);
-                const metricsHtml = metricTags.length
-                    ? metricTags.map((tagText) => `<span class="tag">${escapeHtml(tagText)}</span>`).join('')
-                    : '<span class="tag">--</span>';
-                const weightPath = String(item.weight_path || item.weightPath || '').trim();
-                const weightPathDisplay = weightPath ? escapeHtml(truncateMiddle(weightPath)) : '--';
-                const cometUrl = String(item.comet_log_url || item.comet_url || '').trim();
-                const datasetVersionText = String(datasetVersionRaw == null ? '--' : datasetVersionRaw).trim() || '--';
-                const datasetBadgeText = datasetVersionText === '--'
-                    ? '--'
-                    : (datasetVersionText.toLowerCase().startsWith('v') ? datasetVersionText : `v${datasetVersionText}`);
-                const datasetNameText = datasetIdRaw === '--' ? '--' : `#${datasetIdRaw}`;
-                const encodedWeightPath = encodeURIComponent(weightPath);
-                const encodedCometUrl = encodeURIComponent(cometUrl);
-                const encodedDetail = encodeURIComponent(JSON.stringify(item || {}));
-
+            tbody.innerHTML = state.rows.map((video) => {
+                const id = Number(video.id) || 0;
+                const title = escapeHtml(video.name || '--');
+                const originalFileName = escapeHtml(video.original_file_name || video.file_name || '--');
+                const thumbnailUrl = escapeHtml(video.thumbnail_url || '');
+                const streamUrl = escapeHtml(video.stream_url || '');
+                const durationText = escapeHtml(formatDuration(video.duration_seconds));
+                const sizeText = escapeHtml(formatSizeMB(video.size_mb));
+                const createdAt = escapeHtml(formatDateTime(video.created_at));
+                const description = escapeHtml(video.description || '');
                 return `
-                    <tr>
-                        <td>${escapeHtml(String(taskIdRaw))}</td>
-                        <td>${escapeHtml(String(modelIdRaw))}</td>
+                    <tr data-video-row-id="${id}">
                         <td>
-                            <div class="name-cell">
-                                <span>${escapeHtml(String(datasetNameText))}</span>
-                                <span class="badge secondary sm">${escapeHtml(datasetBadgeText)}</span>
+                            <div class="video-listing">
+                                <button class="video-thumb-button" type="button" data-video-action="preview" data-video-id="${id}" data-video-stream-url="${streamUrl}" data-video-title="${title}" data-video-thumb-url="${thumbnailUrl}" data-video-meta="${escapeHtml(`原文件：${originalFileName}${description ? `｜${description}` : ''}`)}">
+                                    <img class="video-thumb-image" src="${thumbnailUrl}" alt="${title}" loading="lazy" />
+                                </button>
+                                <div class="video-copy">
+                                    <div class="video-name">${title}</div>
+                                    <div class="video-file-name">${originalFileName}</div>
+                                </div>
                             </div>
                         </td>
+                        <td>${durationText}</td>
+                        <td>${sizeText}</td>
+                        <td>${createdAt}</td>
                         <td>
-                            <div class="tech-stack">${metricsHtml}</div>
-                        </td>
-                        <td><span class="badge ${status.cls}">${escapeHtml(status.text)}</span></td>
-                        <td title="${escapeHtml(weightPath)}">${weightPathDisplay}</td>
-                        <td>
-                            <div class="action-wrapper">
-                                <button class="btn-icon action-toggle" title="更多操作"><i class="fa-solid fa-ellipsis"></i></button>
-                                <div class="action-menu">
-                                    <button
-                                        class="btn-icon"
-                                        title="属性"
-                                        data-training-action="properties"
-                                        data-training-detail="${escapeHtml(encodedDetail)}"
-                                    >
-                                        <i class="fa-solid fa-circle-info"></i>
-                                    </button>
-                                    <button
-                                        class="btn-icon download"
-                                        title="复制权重路径"
-                                        data-training-action="copy-weight-path"
-                                        data-training-path="${escapeHtml(encodedWeightPath)}"
-                                    >
-                                        <i class="fa-solid fa-copy"></i>
-                                    </button>
-                                    <button
-                                        class="btn-icon"
-                                        title="${cometUrl ? '打开 Comet 日志' : '无 Comet 日志'}"
-                                        data-training-action="open-comet"
-                                        data-training-comet-url="${escapeHtml(encodedCometUrl)}"
-                                        ${cometUrl ? '' : 'disabled'}
-                                    >
-                                        <i class="fa-solid fa-chart-line"></i>
-                                    </button>
+                            <div class="video-row-actions">
+                                <div class="action-wrapper">
+                                    <button class="btn-icon action-toggle" title="更多操作"><i class="fa-solid fa-ellipsis"></i></button>
+                                    <div class="action-menu">
+                                        <button class="btn-icon" title="预览视频" data-video-action="preview" data-video-id="${id}" data-video-stream-url="${streamUrl}" data-video-title="${title}" data-video-thumb-url="${thumbnailUrl}" data-video-meta="${escapeHtml(`原文件：${originalFileName}${description ? `｜${description}` : ''}`)}"><i class="fa-solid fa-play"></i></button>
+                                        <button class="btn-icon" title="固定间隔抽帧" data-video-action="slice-fixed" data-video-id="${id}"><i class="fa-solid fa-camera-retro"></i></button>
+                                        <button class="btn-icon" title="下载抽帧结果" data-video-action="download-frames" data-video-id="${id}"><i class="fa-solid fa-file-zipper"></i></button>
+                                        <button class="btn-icon" title="查看属性" data-video-action="properties" data-video-detail="${escapeHtml(encodeURIComponent(JSON.stringify(video || {})))}"><i class="fa-solid fa-circle-info"></i></button>
+                                    </div>
                                 </div>
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
-
-            tbody.innerHTML = html;
         };
 
         const renderPaginationControls = () => {
             if (!paginationControls) return;
-
             const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
-            if (state.page > totalPages) {
-                state.page = totalPages;
-            }
-
+            if (state.page > totalPages) state.page = totalPages;
             paginationControls.innerHTML = '';
 
             const prevBtn = document.createElement('button');
@@ -3014,7 +3970,7 @@ document.addEventListener('DOMContentLoaded', () => {
             prevBtn.addEventListener('click', () => {
                 if (state.page <= 1) return;
                 state.page -= 1;
-                fetchTrainingResults();
+                fetchVideos();
             });
             paginationControls.appendChild(prevBtn);
 
@@ -3032,7 +3988,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', () => {
                     if (state.page === i) return;
                     state.page = i;
-                    fetchTrainingResults();
+                    fetchVideos();
                 });
                 paginationControls.appendChild(btn);
             }
@@ -3043,15 +3999,950 @@ document.addEventListener('DOMContentLoaded', () => {
             nextBtn.addEventListener('click', () => {
                 if (state.page >= totalPages) return;
                 state.page += 1;
-                fetchTrainingResults();
+                fetchVideos();
             });
             paginationControls.appendChild(nextBtn);
         };
 
-        async function fetchTrainingResults() {
+        // hideSliceResults clears the current frame result list.
+        const hideSliceResults = () => {
+            if (sliceResults) sliceResults.hidden = true;
+            if (sliceResultsMeta) sliceResultsMeta.textContent = '';
+            if (sliceResultList) sliceResultList.innerHTML = '';
+        };
+
+        // hideFrameCollections clears the current list of existing frame intervals.
+        const hideFrameCollections = () => {
+            if (frameCollections) frameCollections.hidden = true;
+            if (frameCollectionsMeta) frameCollectionsMeta.textContent = '';
+            if (frameCollectionsList) frameCollectionsList.innerHTML = '';
+        };
+
+        // closeSliceModal resets and hides the fixed-interval frame modal.
+        const closeSliceModal = () => {
+            if (!sliceModal) return;
+            sliceModal.hidden = true;
+            activeSliceVideo = null;
+            if (sliceForm) sliceForm.reset();
+            setSliceFeedback('');
+            hideFrameCollections();
+            hideSliceResults();
+        };
+
+        // buildFramePreviewUrl appends a cache-busting token to frame image URLs.
+        const buildFramePreviewUrl = (imageUrl, index) => {
+            const safeUrl = String(imageUrl || '').trim();
+            if (!safeUrl) return '';
+            const marker = safeUrl.includes('?') ? '&' : '?';
+            return `${safeUrl}${marker}preview=${Date.now()}_${index}`;
+        };
+
+        // renderSliceResults renders the newly generated frame images in the modal.
+        const renderSliceResults = (intervalSeconds, frames = [], outputDir = '', downloadUrl = '') => {
+            if (!sliceResults || !sliceResultsMeta || !sliceResultList) return;
+            sliceResults.hidden = false;
+            const safeOutputDir = String(outputDir || '').trim();
+            sliceResultsMeta.textContent = `抽帧间隔：${intervalSeconds}s，共生成 ${frames.length} 张图片${safeOutputDir ? `，输出目录：${safeOutputDir}` : ''}`;
+            sliceResultList.innerHTML = frames.map((item, index) => {
+                const fileName = escapeHtml(item && item.file_name || `frame_${index + 1}.jpg`);
+                const timestampText = escapeHtml(formatDuration(item && item.timestamp_seconds));
+                const sizeText = escapeHtml(formatSizeMB(item && item.size_mb));
+                const rawImageUrl = String(item && item.image_url || '').trim();
+                const imageUrl = escapeHtml(rawImageUrl);
+                const previewImageUrl = escapeHtml(buildFramePreviewUrl(rawImageUrl, index));
+                const imagePath = escapeHtml(item && item.image_path || '');
+                return `
+                    <div class="video-slice-result-item">
+                        <div class="video-slice-result-thumb">
+                            <img src="${previewImageUrl}" alt="${fileName}" loading="lazy" onerror="this.hidden=true; this.parentElement.classList.add('is-error');" />
+                            <span class="video-slice-result-thumb-fallback">预览不可见</span>
+                        </div>
+                        <div class="video-slice-result-copy">
+                            <div class="video-slice-result-name">${fileName}</div>
+                            <div class="video-slice-result-meta">时间点：${timestampText}｜大小：${sizeText}</div>
+                            <div class="video-slice-result-path">${imagePath}</div>
+                        </div>
+                        <a class="btn btn-secondary btn-sm" href="${imageUrl}" target="_blank" rel="noopener noreferrer">
+                            <i class="fa-solid fa-image"></i>
+                            查看原图
+                        </a>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        // renderFrameCollections renders all existing frame interval results for the current video.
+        const renderFrameCollections = (collections = []) => {
+            if (!frameCollections || !frameCollectionsMeta || !frameCollectionsList) return;
+            frameCollections.hidden = false;
+            frameCollectionsMeta.textContent = collections.length
+                ? `当前视频已有 ${collections.length} 组抽帧结果，可按不同抽帧时长查看或下载。`
+                : '当前视频还没有抽帧结果。';
+            frameCollectionsList.innerHTML = collections.map((item) => {
+                const intervalSeconds = Number(item && item.interval_seconds) || 0;
+                const frameCount = Number(item && item.frame_count) || 0;
+                const outputDir = escapeHtml(item && item.output_dir || '');
+                const downloadUrl = escapeHtml(item && item.download_url || '');
+                return `
+                    <div class="video-frame-collection-item">
+                        <div class="video-frame-collection-copy">
+                            <div class="video-slice-result-name">${escapeHtml(`${intervalSeconds}s 抽帧`)}</div>
+                            <div class="video-slice-result-meta">图片数量：${escapeHtml(String(frameCount))}</div>
+                            <div class="video-slice-result-path">${outputDir}</div>
+                        </div>
+                        <div class="video-frame-collection-actions">
+                            <button class="btn btn-secondary btn-sm" type="button" data-video-action="load-frame-collection" data-video-interval="${intervalSeconds}">
+                                <i class="fa-solid fa-images"></i>
+                                查看结果
+                            </button>
+                            <a class="btn btn-secondary btn-sm" href="${downloadUrl}" target="_blank" rel="noopener noreferrer">
+                                <i class="fa-solid fa-file-zipper"></i>
+                                下载
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        // openSliceModal prepares the fixed-interval frame modal for the selected video.
+        const openSliceModal = (video) => {
+            if (!sliceModal) return;
+            activeSliceVideo = video && typeof video === 'object' ? video : null;
+            sliceModal.hidden = false;
+            setSliceFeedback('');
+            hideFrameCollections();
+            hideSliceResults();
+            if (sliceForm) sliceForm.reset();
+            const storedInterval = Number(activeSliceVideo && activeSliceVideo.frame_interval_seconds);
+            if (sliceDurationInput) sliceDurationInput.value = Number.isInteger(storedInterval) && storedInterval > 0 ? String(storedInterval) : '1';
+            if (sliceTitle) {
+                const safeName = activeSliceVideo && activeSliceVideo.name ? String(activeSliceVideo.name) : '固定间隔抽帧';
+                sliceTitle.textContent = `固定间隔抽帧 - ${safeName}`;
+            }
+            if (sliceDurationInput) sliceDurationInput.focus();
+        };
+
+        const loadExistingSlices = async (video, targetInterval = 0) => {
+            const targetId = Number(video && video.id);
+            if (!Number.isInteger(targetId) || targetId <= 0) {
+                return;
+            }
+
+            try {
+                setSliceFeedback('检测到已完成抽帧，正在读取图片路径...', 'info');
+                const result = await apiRequest(`/videos/${targetId}/frames/fixed`, {
+                    method: 'GET',
+                    query: targetInterval > 0 ? { interval_seconds: targetInterval } : {},
+                });
+                const frames = Array.isArray(result && result.frames) ? result.frames : [];
+                const intervalSeconds = Number(result && result.interval_seconds) || Number(video && video.frame_interval_seconds) || 0;
+                const outputDir = String(result && result.frame_output_dir || video && video.frame_output_dir || '').trim();
+                const downloadUrl = String(result && result.download_url || video && video.frame_download_url || '').trim();
+                const returnedVideo = result && result.video ? result.video : null;
+                if (returnedVideo && Number(returnedVideo.id)) {
+                    state.rows = state.rows.map((item) => (
+                        Number(item && item.id) === Number(returnedVideo.id)
+                            ? returnedVideo
+                            : item
+                    ));
+                    renderRows();
+                }
+                if (frames.length) {
+                    renderSliceResults(intervalSeconds, frames, outputDir, downloadUrl);
+                    setSliceFeedback('已返回已有抽帧图片路径。', 'info');
+                } else {
+                    setSliceFeedback('当前记录标记为已抽帧，但没有读取到图片文件。', 'error');
+                }
+            } catch (error) {
+                setSliceFeedback(`读取已有图片路径失败: ${error.message}`, 'error');
+            }
+        };
+
+        // loadFrameCollections fetches all existing frame interval results for the selected video.
+        const loadFrameCollections = async (video) => {
+            const targetId = Number(video && video.id);
+            if (!Number.isInteger(targetId) || targetId <= 0) {
+                return;
+            }
+
+            try {
+                const result = await apiRequest(`/videos/${targetId}/frames/collections`, {
+                    method: 'GET',
+                });
+                const collections = Array.isArray(result && result.collections) ? result.collections : [];
+                renderFrameCollections(collections);
+            } catch (error) {
+                hideFrameCollections();
+                setSliceFeedback(`读取抽帧结果列表失败: ${error.message}`, 'error');
+            }
+        };
+
+        const closePreviewModal = () => {
+            if (!previewModal) return;
+            previewModal.hidden = true;
+            if (previewPlayer) {
+                previewPlayer.pause();
+                previewPlayer.removeAttribute('src');
+                previewPlayer.removeAttribute('poster');
+                previewPlayer.load();
+            }
+            if (previewMeta) previewMeta.textContent = '';
+        };
+
+        const openPreviewModal = ({ title, streamUrl, thumbUrl, meta }) => {
+            if (!previewModal || !previewPlayer) return;
+            previewModal.hidden = false;
+            if (previewTitle) previewTitle.textContent = title || '视频预览';
+            if (previewMeta) previewMeta.textContent = meta || '';
+            previewPlayer.src = streamUrl || '';
+            if (thumbUrl) {
+                previewPlayer.poster = thumbUrl;
+            } else {
+                previewPlayer.removeAttribute('poster');
+            }
+            previewPlayer.load();
+        };
+
+        const decodePayloadValue = (raw) => {
+            const text = String(raw || '');
+            if (!text) return '';
+            try {
+                return decodeURIComponent(text);
+            } catch (error) {
+                return text;
+            }
+        };
+
+        async function fetchVideos() {
             setLoadingState(true);
             renderPaginationControls();
-            renderPlaceholderRow('训练结果加载中...');
+            renderPlaceholderRow('视频列表加载中...');
+            clearAlert(messageSlot);
+
+            try {
+                const data = await apiRequest('/videos', {
+                    query: {
+                        page: state.page,
+                        page_size: state.pageSize,
+                        keyword: state.keyword,
+                    },
+                });
+                const list = Array.isArray(data && data.list) ? data.list : [];
+                const total = Number(data && data.total);
+                state.rows = list;
+                state.total = Number.isFinite(total) ? total : list.length;
+                renderRows();
+                renderPaginationControls();
+                if (totalItemsEl) totalItemsEl.textContent = String(state.total);
+            } catch (error) {
+                state.rows = [];
+                state.total = 0;
+                renderPlaceholderRow('视频数据加载失败');
+                renderPaginationControls();
+                if (totalItemsEl) totalItemsEl.textContent = '0';
+                showAlert(messageSlot, `加载视频失败: ${error.message}`, 'error');
+            } finally {
+                setLoadingState(false);
+                renderPaginationControls();
+            }
+        }
+
+        const applySearch = () => {
+            state.keyword = String(searchInput && searchInput.value || '').trim();
+            state.page = 1;
+            fetchVideos();
+        };
+
+        const openUploadModal = () => {
+            if (!uploadModal) return;
+            uploadModal.hidden = false;
+            setUploadFeedback('');
+            if (videoNameInput) videoNameInput.focus();
+        };
+
+        const closeUploadModal = () => {
+            if (!uploadModal) return;
+            uploadModal.hidden = true;
+            selectedVideoFile = null;
+            setUploadFeedback('');
+            if (uploadForm) uploadForm.reset();
+            if (videoFileHint) videoFileHint.textContent = defaultFileHint;
+        };
+
+        setupDropzone({
+            zone: videoFileDropzone,
+            fileInput: videoFileInput,
+            hintEl: videoFileHint,
+            defaultHint: defaultFileHint,
+            onFile: (file) => {
+                selectedVideoFile = file;
+                if (videoNameInput && !videoNameInput.value.trim()) {
+                    videoNameInput.value = trimExtension(file.name);
+                }
+                if (videoFileNameInput) {
+                    videoFileNameInput.value = file.name;
+                }
+            },
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => {
+                    applySearch();
+                }, 300);
+            });
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                clearTimeout(searchTimer);
+                applySearch();
+            });
+        }
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                clearTimeout(searchTimer);
+                applySearch();
+            });
+        }
+
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                fetchVideos();
+            });
+        }
+
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', (e) => {
+                const next = Number(e.target.value);
+                state.pageSize = Number.isFinite(next) && next > 0 ? next : 10;
+                state.page = 1;
+                fetchVideos();
+            });
+        }
+
+        if (uploadOpenBtn) {
+            uploadOpenBtn.addEventListener('click', openUploadModal);
+        }
+
+        uploadCloseBtns.forEach((btn) => {
+            btn.addEventListener('click', closeUploadModal);
+        });
+
+        if (uploadModal) {
+            uploadModal.addEventListener('click', (e) => {
+                if (e.target === uploadModal) {
+                    closeUploadModal();
+                }
+            });
+        }
+
+        previewCloseBtns.forEach((btn) => {
+            btn.addEventListener('click', closePreviewModal);
+        });
+
+        if (previewModal) {
+            previewModal.addEventListener('click', (e) => {
+                if (e.target === previewModal) {
+                    closePreviewModal();
+                }
+            });
+        }
+
+        sliceCloseBtns.forEach((btn) => {
+            btn.addEventListener('click', closeSliceModal);
+        });
+
+        if (sliceModal) {
+            sliceModal.addEventListener('click', (e) => {
+                if (e.target === sliceModal) {
+                    closeSliceModal();
+                }
+            });
+        }
+
+        if (uploadForm) {
+            uploadForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!uploadForm.checkValidity()) {
+                    uploadForm.reportValidity();
+                    return;
+                }
+                if (!(selectedVideoFile instanceof File)) {
+                    setUploadFeedback('请选择要导入的视频文件。', 'error');
+                    return;
+                }
+
+                const submitBtn = uploadForm.querySelector('[data-video-upload-submit]');
+                const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
+                const form = new FormData();
+                form.append('file', selectedVideoFile, selectedVideoFile.name);
+                form.append('name', String(videoNameInput && videoNameInput.value || '').trim());
+                form.append('description', String(uploadForm.querySelector('#video-description') && uploadForm.querySelector('#video-description').value || '').trim());
+
+                try {
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 导入中';
+                    }
+                    setUploadFeedback('正在上传视频并生成封面...', 'info');
+                    await apiRequest('/videos/upload', {
+                        method: 'POST',
+                        formData: form,
+                    });
+                    showAlert(messageSlot, '视频导入成功。', 'info');
+                    closeUploadModal();
+                    state.page = 1;
+                    fetchVideos();
+                } catch (error) {
+                    setUploadFeedback(`导入失败: ${error.message}`, 'error');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalSubmitText;
+                    }
+                }
+            });
+        }
+
+        if (sliceForm) {
+            sliceForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                if (!activeSliceVideo || !Number(activeSliceVideo.id)) {
+                    setSliceFeedback('未找到待抽帧的视频记录。', 'error');
+                    return;
+                }
+                if (!sliceForm.checkValidity()) {
+                    sliceForm.reportValidity();
+                    return;
+                }
+
+                const rawDuration = String(sliceDurationInput && sliceDurationInput.value || '').trim();
+                const durationSeconds = Number(rawDuration);
+                if (!Number.isInteger(durationSeconds) || durationSeconds < 1) {
+                    setSliceFeedback('抽帧间隔必须是大于等于 1 的整数秒，不支持小数。', 'error');
+                    return;
+                }
+
+                const submitBtn = sliceForm.querySelector('[data-video-slice-submit]');
+                const originalSubmitText = submitBtn ? submitBtn.innerHTML : '';
+
+                try {
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 抽帧中';
+                    }
+                    setSliceFeedback('正在按固定间隔抽帧，请稍候...', 'info');
+                    const result = await apiRequest(`/videos/${Number(activeSliceVideo.id)}/frames/fixed`, {
+                        method: 'POST',
+                        body: {
+                            interval_seconds: durationSeconds,
+                        },
+                    });
+                    const frames = Array.isArray(result && result.frames) ? result.frames : [];
+                    const returnedVideo = result && result.video ? result.video : null;
+                    if (returnedVideo && Number(returnedVideo.id)) {
+                        activeSliceVideo = returnedVideo;
+                        state.rows = state.rows.map((item) => (
+                            Number(item && item.id) === Number(returnedVideo.id)
+                                ? returnedVideo
+                                : item
+                        ));
+                        renderRows();
+                    }
+                    await loadFrameCollections(returnedVideo || activeSliceVideo);
+                    renderSliceResults(
+                        durationSeconds,
+                        frames,
+                        String(result && result.frame_output_dir || returnedVideo && returnedVideo.frame_output_dir || '').trim(),
+                        String(result && result.download_url || returnedVideo && returnedVideo.frame_download_url || '').trim(),
+                    );
+                    setSliceFeedback(String(result && result.message || `抽帧完成，已生成 ${frames.length} 张图片。`), 'info');
+                } catch (error) {
+                    hideSliceResults();
+                    setSliceFeedback(`抽帧失败: ${error.message}`, 'error');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalSubmitText;
+                    }
+                }
+            });
+        }
+
+        if (frameCollectionsList) {
+            frameCollectionsList.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('[data-video-action="load-frame-collection"]');
+                if (!actionBtn) return;
+                const targetInterval = Number(actionBtn.dataset.videoInterval);
+                if (!activeSliceVideo || !Number(activeSliceVideo.id) || !Number.isInteger(targetInterval) || targetInterval < 1) {
+                    setSliceFeedback('未找到可加载的抽帧时长。', 'error');
+                    return;
+                }
+                if (sliceDurationInput) {
+                    sliceDurationInput.value = String(targetInterval);
+                }
+                loadExistingSlices(activeSliceVideo, targetInterval);
+            });
+        }
+
+        if (tbody) {
+            tbody.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('[data-video-action]');
+                if (!actionBtn) return;
+
+                const wrapper = actionBtn.closest('.action-wrapper');
+                if (wrapper) wrapper.classList.remove('expanded');
+
+                const action = String(actionBtn.dataset.videoAction || '').trim();
+                if (action === 'preview') {
+                    openPreviewModal({
+                        title: decodePayloadValue(actionBtn.dataset.videoTitle),
+                        streamUrl: decodePayloadValue(actionBtn.dataset.videoStreamUrl),
+                        thumbUrl: decodePayloadValue(actionBtn.dataset.videoThumbUrl),
+                        meta: decodePayloadValue(actionBtn.dataset.videoMeta),
+                    });
+                    return;
+                }
+
+                if (action === 'slice-fixed') {
+                    const targetId = Number(actionBtn.dataset.videoId);
+                    const currentVideo = state.rows.find((item) => Number(item && item.id) === targetId);
+                    if (!currentVideo) {
+                        showAlert(messageSlot, '未找到对应视频，请刷新后重试。', 'error');
+                        return;
+                    }
+                    openSliceModal(currentVideo);
+                    loadFrameCollections(currentVideo);
+                    if (currentVideo && currentVideo.frame_capture_completed) {
+                        loadExistingSlices(currentVideo);
+                    }
+                    return;
+                }
+
+                if (action === 'download-frames') {
+                    const targetId = Number(actionBtn.dataset.videoId);
+                    const currentVideo = state.rows.find((item) => Number(item && item.id) === targetId);
+                    if (!currentVideo) {
+                        showAlert(messageSlot, '未找到对应视频，请刷新后重试。', 'error');
+                        return;
+                    }
+                    openSliceModal(currentVideo);
+                    setSliceFeedback('请选择要下载的抽帧时长。', 'info');
+                    loadFrameCollections(currentVideo);
+                    if (currentVideo && currentVideo.frame_capture_completed) {
+                        loadExistingSlices(currentVideo);
+                    }
+                    return;
+                }
+
+                if (action === 'properties') {
+                    const raw = decodePayloadValue(actionBtn.dataset.videoDetail);
+                    let detail = {};
+                    try {
+                        detail = raw ? JSON.parse(raw) : {};
+                    } catch (error) {
+                        detail = { raw };
+                    }
+                    const title = detail && detail.id ? `视频属性 - #${detail.id}` : '视频属性';
+                    openPropertyModal(title, detail);
+                }
+            });
+        }
+
+        fetchVideos();
+    }
+
+    // initTrainingLogPage initializes the training log editor and list management page.
+    function initTrainingLogPage() {
+        const table = document.querySelector('[data-training-table]');
+        if (!table) return;
+
+        const tbody = table.querySelector('tbody');
+        const searchInput = document.querySelector('[data-training-search-input]');
+        const searchBtn = document.querySelector('[data-training-search-btn]');
+        const modelIdInput = document.querySelector('[data-training-filter-model-id]');
+        const datasetIdInput = document.querySelector('[data-training-filter-dataset-id]');
+        const statusSelect = document.querySelector('[data-training-filter-status]');
+        const resetFilterBtn = document.querySelector('[data-training-filter-reset]');
+        const refreshBtn = document.querySelector('[data-training-refresh-btn]');
+        const pageSizeSelect = document.querySelector('[data-training-page-size]');
+        const totalItemsSpan = document.querySelector('[data-training-total-items]');
+        const paginationControls = document.querySelector('[data-training-pagination]');
+        const messageSlot = document.querySelector('[data-training-message]');
+        const apiBaseLabel = document.querySelector('[data-training-api-base]');
+        const formEl = document.querySelector('[data-training-log-form]');
+        const formIdInput = document.querySelector('[data-training-log-id]');
+        const formNameInput = document.querySelector('#training-log-name');
+        const formStatusInput = document.querySelector('#training-log-status');
+        const formModelIdInput = document.querySelector('#training-log-model-id');
+        const formDatasetIdInput = document.querySelector('#training-log-dataset-id');
+        const formDatasetVersionInput = document.querySelector('#training-log-dataset-version');
+        const formWeightPathInput = document.querySelector('#training-log-weight-path');
+        const formCometUrlInput = document.querySelector('#training-log-comet-url');
+        const formMetricsInput = document.querySelector('#training-log-metrics');
+        const formTrainingMarkdownInput = document.querySelector('#training-log-markdown');
+        const formCometMarkdownInput = document.querySelector('#training-log-comet-markdown');
+        const formFeedback = document.querySelector('[data-training-log-form-feedback]');
+        const submitBtn = document.querySelector('[data-training-log-submit-btn]');
+        const resetFormBtns = document.querySelectorAll('[data-training-log-reset-btn]');
+
+        if (apiBaseLabel) {
+            apiBaseLabel.textContent = apiBaseUrl;
+        }
+
+        const state = {
+            page: 1,
+            pageSize: Number(pageSizeSelect && pageSizeSelect.value) || 10,
+            keyword: '',
+            modelId: null,
+            datasetId: null,
+            status: '',
+            total: 0,
+            rows: [],
+            loading: false,
+            editingId: null,
+        };
+        let searchTimer = null;
+
+        // setFormFeedback renders editor feedback inside the training log card.
+        const setFormFeedback = (message, tone = 'info') => {
+            if (!formFeedback) return;
+            if (!message) {
+                formFeedback.hidden = true;
+                formFeedback.className = 'model-import-feedback';
+                formFeedback.textContent = '';
+                return;
+            }
+            formFeedback.hidden = false;
+            formFeedback.className = `model-import-feedback alert ${tone === 'error' ? 'error' : 'info'}`;
+            formFeedback.textContent = message;
+        };
+
+        // setLoadingState disables list controls during remote requests.
+        const setLoadingState = (loading) => {
+            state.loading = Boolean(loading);
+            [
+                searchInput,
+                searchBtn,
+                modelIdInput,
+                datasetIdInput,
+                statusSelect,
+                resetFilterBtn,
+                refreshBtn,
+                pageSizeSelect,
+            ].forEach((el) => {
+                if (el) el.disabled = state.loading;
+            });
+        };
+
+        // setSubmitButtonState updates the editor button label for create/update mode.
+        const setSubmitButtonState = () => {
+            if (!submitBtn) return;
+            submitBtn.innerHTML = state.editingId
+                ? '<i class="fa-solid fa-floppy-disk"></i> 更新训练日志'
+                : '<i class="fa-solid fa-floppy-disk"></i> 保存训练日志';
+        };
+
+        // renderPlaceholderRow shows a placeholder row in the training log table.
+        const renderPlaceholderRow = (message) => {
+            tbody.innerHTML = `<tr><td colspan="7" class="table-state">${escapeHtml(message)}</td></tr>`;
+        };
+
+        // parsePositiveInteger parses an integer form or filter field that must stay positive.
+        const parsePositiveInteger = (raw) => {
+            const num = Number.parseInt(String(raw || '').trim(), 10);
+            if (!Number.isInteger(num) || num <= 0) return null;
+            return num;
+        };
+
+        // parseMetricDetail converts persisted metric JSON into an object for rendering.
+        const parseMetricDetail = (metricDetail) => {
+            if (metricDetail && typeof metricDetail === 'object') return metricDetail;
+            if (typeof metricDetail !== 'string') return null;
+            const trimmed = metricDetail.trim();
+            if (!trimmed) return null;
+            try {
+                const parsed = JSON.parse(trimmed);
+                return parsed && typeof parsed === 'object' ? parsed : null;
+            } catch (error) {
+                return null;
+            }
+        };
+
+        // formatMetricValue formats metric numbers for compact chip display.
+        const formatMetricValue = (value) => {
+            const num = Number(value);
+            if (Number.isFinite(num)) {
+                const precision = Math.abs(num) >= 1 ? 3 : 4;
+                return num.toFixed(precision).replace(/\.?0+$/, '');
+            }
+            return String(value);
+        };
+
+        // buildMetricTags creates the metric chips for each training log row.
+        const buildMetricTags = (item) => {
+            const detail = parseMetricDetail(item && (item.metric_detail || item.metricDetail || item.metrics));
+            if (!detail) return [];
+            return Object.entries(detail)
+                .filter(([key, val]) => key && val != null && val !== '')
+                .slice(0, 4)
+                .map(([key, val]) => `${key}: ${formatMetricValue(val)}`);
+        };
+
+        // getTrainingStatusMeta maps backend status codes into badge styles.
+        const getTrainingStatusMeta = (statusValue) => {
+            const num = Number(statusValue);
+            if (Number.isFinite(num)) {
+                const code = Math.trunc(num);
+                if (code === 0) return { cls: 'warning', text: '待开始' };
+                if (code === 1) return { cls: 'processing', text: '训练中' };
+                if (code === 2) return { cls: 'success', text: '成功' };
+                if (code === 3) return { cls: 'error', text: '失败' };
+                if (code === 4) return { cls: 'warning', text: '已中断' };
+            }
+            return { cls: 'secondary', text: '未知' };
+        };
+
+        // truncateMiddle shortens long file paths without losing the head or tail.
+        const truncateMiddle = (text, maxLength = 52) => {
+            const str = String(text || '');
+            if (str.length <= maxLength) return str;
+            const keep = Math.max(8, Math.floor((maxLength - 3) / 2));
+            return `${str.slice(0, keep)}...${str.slice(-keep)}`;
+        };
+
+        // decodeDataValue decodes URI-encoded payloads stored in action button datasets.
+        const decodeDataValue = (value) => {
+            const raw = String(value || '');
+            if (!raw) return '';
+            try {
+                return decodeURIComponent(raw);
+            } catch (error) {
+                return raw;
+            }
+        };
+
+        // resetTrainingLogForm clears the editor and exits update mode.
+        const resetTrainingLogForm = () => {
+            if (formEl && typeof formEl.reset === 'function') {
+                formEl.reset();
+            }
+            if (formIdInput) formIdInput.value = '';
+            if (formDatasetVersionInput) formDatasetVersionInput.value = '1.000';
+            if (formStatusInput) formStatusInput.value = '2';
+            state.editingId = null;
+            setSubmitButtonState();
+            setFormFeedback('');
+        };
+
+        // fillTrainingLogForm loads one existing training log back into the editor.
+        const fillTrainingLogForm = (item) => {
+            const resolvedId = Number(item && item.id);
+            state.editingId = Number.isFinite(resolvedId) && resolvedId > 0 ? resolvedId : null;
+            if (formIdInput) formIdInput.value = state.editingId ? String(state.editingId) : '';
+            if (formNameInput) formNameInput.value = String(item && item.training_name || '').trim();
+            if (formStatusInput) formStatusInput.value = String(item && item.training_status != null ? item.training_status : 2);
+            if (formModelIdInput) formModelIdInput.value = String(item && item.model_id != null ? item.model_id : '');
+            if (formDatasetIdInput) formDatasetIdInput.value = String(item && item.dataset_id != null ? item.dataset_id : '');
+            if (formDatasetVersionInput) formDatasetVersionInput.value = String(item && item.dataset_version != null ? item.dataset_version : '1.000');
+            if (formWeightPathInput) formWeightPathInput.value = String(item && item.weight_path || '').trim();
+            if (formCometUrlInput) formCometUrlInput.value = String(item && item.comet_log_url || '').trim();
+            if (formMetricsInput) {
+                const parsedMetrics = parseMetricDetail(item && item.metric_detail);
+                formMetricsInput.value = parsedMetrics ? JSON.stringify(parsedMetrics, null, 2) : '';
+            }
+            if (formTrainingMarkdownInput) formTrainingMarkdownInput.value = String(item && item.training_log_markdown || '');
+            if (formCometMarkdownInput) formCometMarkdownInput.value = String(item && item.comet_log_markdown || '');
+            setSubmitButtonState();
+            setFormFeedback(`已载入训练日志 #${state.editingId || '--'}，可直接修改后保存。`, 'info');
+            if (formEl && typeof formEl.scrollIntoView === 'function') {
+                formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+
+        // buildTrainingLogPayload validates the editor and produces the API payload.
+        const buildTrainingLogPayload = () => {
+            const trainingName = String(formNameInput && formNameInput.value || '').trim();
+            const modelId = parsePositiveInteger(formModelIdInput && formModelIdInput.value);
+            const datasetId = parsePositiveInteger(formDatasetIdInput && formDatasetIdInput.value);
+            const datasetVersion = Number(String(formDatasetVersionInput && formDatasetVersionInput.value || '').trim() || '0');
+            const trainingStatus = Number.parseInt(String(formStatusInput && formStatusInput.value || '2').trim(), 10);
+            const weightPath = String(formWeightPathInput && formWeightPathInput.value || '').trim();
+            const cometLogUrl = String(formCometUrlInput && formCometUrlInput.value || '').trim();
+            const trainingLogMarkdown = String(formTrainingMarkdownInput && formTrainingMarkdownInput.value || '');
+            const cometLogMarkdown = String(formCometMarkdownInput && formCometMarkdownInput.value || '');
+            const metricsText = String(formMetricsInput && formMetricsInput.value || '').trim();
+
+            if (!trainingName) throw new Error('日志名称不能为空。');
+            if (modelId == null) throw new Error('模型 ID 需为大于 0 的整数。');
+            if (datasetId == null) throw new Error('数据集 ID 需为大于 0 的整数。');
+            if (!Number.isFinite(datasetVersion) || datasetVersion < 0) throw new Error('数据集版本需为大于等于 0 的数字。');
+            if (!Number.isInteger(trainingStatus) || trainingStatus < 0 || trainingStatus > 4) throw new Error('训练状态无效。');
+
+            let metricDetail = {};
+            if (metricsText) {
+                try {
+                    metricDetail = JSON.parse(metricsText);
+                } catch (error) {
+                    throw new Error('核心指标 JSON 格式不正确。');
+                }
+            }
+
+            return {
+                training_name: trainingName,
+                model_id: modelId,
+                dataset_id: datasetId,
+                dataset_version: datasetVersion,
+                training_status: trainingStatus,
+                metric_detail: metricDetail,
+                weight_path: weightPath,
+                comet_log_url: cometLogUrl,
+                training_log_markdown: trainingLogMarkdown,
+                comet_log_markdown: cometLogMarkdown,
+            };
+        };
+
+        // renderRows renders fetched training logs into the table body.
+        const renderRows = () => {
+            if (!Array.isArray(state.rows) || state.rows.length === 0) {
+                renderPlaceholderRow('暂无训练日志');
+                return;
+            }
+
+            const html = state.rows.map((item) => {
+                const logId = item.id ?? '--';
+                const trainingName = String(item.training_name || '').trim() || `训练记录 #${logId}`;
+                const status = getTrainingStatusMeta(item.training_status ?? item.status);
+                const metricTags = buildMetricTags(item);
+                const metricsHtml = metricTags.length
+                    ? metricTags.map((tagText) => `<span class="tag">${escapeHtml(tagText)}</span>`).join('')
+                    : '<span class="tag">--</span>';
+                const weightPath = String(item.weight_path || '').trim();
+                const cometUrl = String(item.comet_log_url || '').trim();
+                const infoTags = [];
+                if (String(item.training_log_markdown || '').trim()) infoTags.push('训练MD');
+                if (String(item.comet_log_markdown || '').trim()) infoTags.push('Comet MD');
+                if (cometUrl) infoTags.push('Comet URL');
+                const infoHtml = infoTags.length
+                    ? infoTags.map((tagText) => `<span class="tag">${escapeHtml(tagText)}</span>`).join('')
+                    : '<span class="tag">无附加记录</span>';
+                const detailPayload = encodeURIComponent(JSON.stringify(item || {}));
+                const encodedCometUrl = encodeURIComponent(cometUrl);
+                const encodedWeightPath = encodeURIComponent(weightPath);
+                const encodedName = encodeURIComponent(trainingName);
+                const updatedAt = formatDateTime(item.update_time || item.create_time);
+                const datasetVersionText = String(item.dataset_version == null ? '--' : item.dataset_version).trim() || '--';
+
+                return `
+                    <tr>
+                        <td>
+                            <div class="name-cell">
+                                <div class="name-main">
+                                    <span class="model-name-text">${escapeHtml(trainingName)}</span>
+                                    <span class="badge secondary sm">#${escapeHtml(String(logId))}</span>
+                                </div>
+                                <span title="${escapeHtml(weightPath)}">${escapeHtml(weightPath ? truncateMiddle(weightPath) : '--')}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="name-cell">
+                                <span>模型 #${escapeHtml(String(item.model_id ?? '--'))}</span>
+                                <span>数据集 #${escapeHtml(String(item.dataset_id ?? '--'))} / v${escapeHtml(datasetVersionText)}</span>
+                            </div>
+                        </td>
+                        <td><div class="tech-stack">${metricsHtml}</div></td>
+                        <td><span class="badge ${status.cls}">${escapeHtml(status.text)}</span></td>
+                        <td><div class="tech-stack">${infoHtml}</div></td>
+                        <td>${escapeHtml(updatedAt)}</td>
+                        <td>
+                            <div class="action-wrapper">
+                                <button class="btn-icon action-toggle" title="更多操作"><i class="fa-solid fa-ellipsis"></i></button>
+                                <div class="action-menu">
+                                    <button class="btn-icon" title="编辑" data-training-action="edit" data-training-detail="${escapeHtml(detailPayload)}">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button class="btn-icon" title="属性" data-training-action="properties" data-training-detail="${escapeHtml(detailPayload)}">
+                                        <i class="fa-solid fa-circle-info"></i>
+                                    </button>
+                                    <button class="btn-icon download" title="复制权重路径" data-training-action="copy-weight-path" data-training-path="${escapeHtml(encodedWeightPath)}" ${weightPath ? '' : 'disabled'}>
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                    <button class="btn-icon" title="打开 Comet 日志" data-training-action="open-comet" data-training-comet-url="${escapeHtml(encodedCometUrl)}" ${cometUrl ? '' : 'disabled'}>
+                                        <i class="fa-solid fa-chart-line"></i>
+                                    </button>
+                                    <button class="btn-icon delete" title="删除" data-training-action="delete" data-training-id="${escapeHtml(String(logId))}" data-training-name="${escapeHtml(encodedName)}">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = html;
+        };
+
+        // renderPaginationControls renders training log pagination controls.
+        const renderPaginationControls = () => {
+            if (!paginationControls) return;
+
+            const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+            if (state.page > totalPages) {
+                state.page = totalPages;
+            }
+
+            paginationControls.innerHTML = '';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+            prevBtn.disabled = state.page <= 1 || state.loading;
+            prevBtn.addEventListener('click', () => {
+                if (state.page <= 1) return;
+                state.page -= 1;
+                fetchTrainingLogs();
+            });
+            paginationControls.appendChild(prevBtn);
+
+            let startPage = Math.max(1, state.page - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+
+            for (let i = startPage; i <= endPage; i += 1) {
+                const btn = document.createElement('button');
+                btn.textContent = String(i);
+                if (i === state.page) btn.classList.add('active');
+                btn.disabled = state.loading;
+                btn.addEventListener('click', () => {
+                    if (state.page === i) return;
+                    state.page = i;
+                    fetchTrainingLogs();
+                });
+                paginationControls.appendChild(btn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+            nextBtn.disabled = state.page >= totalPages || state.loading;
+            nextBtn.addEventListener('click', () => {
+                if (state.page >= totalPages) return;
+                state.page += 1;
+                fetchTrainingLogs();
+            });
+            paginationControls.appendChild(nextBtn);
+        };
+
+        // fetchTrainingLogs loads the current training log page from the backend.
+        async function fetchTrainingLogs() {
+            setLoadingState(true);
+            renderPaginationControls();
+            renderPlaceholderRow('训练日志加载中...');
             clearAlert(messageSlot);
 
             try {
@@ -3072,47 +4963,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.total = Number.isFinite(total) ? total : list.length;
                 renderRows();
                 renderPaginationControls();
-
                 if (totalItemsSpan) {
                     totalItemsSpan.textContent = String(state.total);
                 }
             } catch (error) {
                 state.rows = [];
                 state.total = 0;
-                renderPlaceholderRow('训练结果加载失败');
+                renderPlaceholderRow('训练日志加载失败');
                 renderPaginationControls();
                 if (totalItemsSpan) {
                     totalItemsSpan.textContent = '0';
                 }
-                showAlert(messageSlot, `加载训练结果失败: ${error.message}`, 'error');
+                showAlert(messageSlot, `加载训练日志失败: ${error.message}`, 'error');
             } finally {
                 setLoadingState(false);
                 renderPaginationControls();
             }
         }
 
+        // applyFilters applies the current list filters and reloads the table.
         const applyFilters = () => {
             const keyword = String(searchInput && searchInput.value || '').trim();
             const modelIdRaw = String(modelIdInput && modelIdInput.value || '').trim();
             const datasetIdRaw = String(datasetIdInput && datasetIdInput.value || '').trim();
-            const modelId = modelIdRaw ? parsePositiveInteger(modelIdRaw) : null;
-            const datasetId = datasetIdRaw ? parsePositiveInteger(datasetIdRaw) : null;
+            const nextModelId = modelIdRaw ? parsePositiveInteger(modelIdRaw) : null;
+            const nextDatasetId = datasetIdRaw ? parsePositiveInteger(datasetIdRaw) : null;
 
-            if (modelIdRaw && modelId == null) {
+            if (modelIdRaw && nextModelId == null) {
                 showAlert(messageSlot, '模型ID 需为大于 0 的整数。', 'error');
                 return;
             }
-            if (datasetIdRaw && datasetId == null) {
+            if (datasetIdRaw && nextDatasetId == null) {
                 showAlert(messageSlot, '数据集ID 需为大于 0 的整数。', 'error');
                 return;
             }
 
             state.keyword = keyword;
-            state.modelId = modelId;
-            state.datasetId = datasetId;
+            state.modelId = nextModelId;
+            state.datasetId = nextDatasetId;
             state.status = String(statusSelect && statusSelect.value || '').trim();
             state.page = 1;
-            fetchTrainingResults();
+            fetchTrainingLogs();
         };
 
         if (searchInput) {
@@ -3161,8 +5052,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
+        if (resetFilterBtn) {
+            resetFilterBtn.addEventListener('click', () => {
                 if (searchInput) searchInput.value = '';
                 if (modelIdInput) modelIdInput.value = '';
                 if (datasetIdInput) datasetIdInput.value = '';
@@ -3174,7 +5065,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                fetchTrainingResults();
+                fetchTrainingLogs();
             });
         }
 
@@ -3183,19 +5074,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 const next = Number(e.target.value);
                 state.pageSize = Number.isFinite(next) && next > 0 ? next : 10;
                 state.page = 1;
-                fetchTrainingResults();
+                fetchTrainingLogs();
             });
         }
 
-        const decodeDataValue = (value) => {
-            const raw = String(value || '');
-            if (!raw) return '';
-            try {
-                return decodeURIComponent(raw);
-            } catch (error) {
-                return raw;
-            }
-        };
+        resetFormBtns.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                resetTrainingLogForm();
+            });
+        });
+
+        if (formEl) {
+            formEl.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                setFormFeedback('');
+
+                let payload = null;
+                try {
+                    payload = buildTrainingLogPayload();
+                } catch (error) {
+                    setFormFeedback(String(error && error.message || '表单校验失败。'), 'error');
+                    return;
+                }
+
+                const targetId = state.editingId;
+                const endpoint = targetId ? `/training-results/${targetId}` : '/training-results';
+                const method = targetId ? 'PATCH' : 'POST';
+                if (submitBtn) submitBtn.disabled = true;
+
+                try {
+                    await apiRequest(endpoint, {
+                        method,
+                        body: JSON.stringify(payload),
+                    });
+                    setFormFeedback(targetId ? '训练日志更新成功。' : '训练日志保存成功。', 'info');
+                    resetTrainingLogForm();
+                    fetchTrainingLogs();
+                } catch (error) {
+                    setFormFeedback(`${targetId ? '更新' : '保存'}训练日志失败: ${error.message}`, 'error');
+                } finally {
+                    if (submitBtn) submitBtn.disabled = false;
+                }
+            });
+        }
 
         if (tbody) {
             tbody.addEventListener('click', async (e) => {
@@ -3206,7 +5127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (wrapper) wrapper.classList.remove('expanded');
 
                 const action = actionBtn.dataset.trainingAction;
-                if (action === 'properties') {
+                if (action === 'edit' || action === 'properties') {
                     const raw = decodeDataValue(actionBtn.dataset.trainingDetail);
                     let detail = {};
                     try {
@@ -3214,13 +5135,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (error) {
                         detail = { raw };
                     }
-                    const titleId = detail && (detail.id ?? detail.training_id ?? detail.task_id);
-                    const title = titleId != null ? `训练结果属性 - #${titleId}` : '训练结果属性';
+
+                    if (action === 'edit') {
+                        fillTrainingLogForm(detail);
+                        return;
+                    }
+
+                    const titleId = detail && detail.id;
+                    const title = titleId != null ? `训练日志属性 - #${titleId}` : '训练日志属性';
                     openPropertyModal(title, detail, {
                         editAction: {
-                            label: '尝试修改',
+                            label: '加载到表单',
                             handler: async () => {
-                                showAlert(messageSlot, '训练结果记录当前仅提供 POST/GET，后端暂无更新接口，暂不能直接修改。', 'info');
+                                fillTrainingLogForm(detail);
                             },
                         },
                     });
@@ -3255,11 +5182,35 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
                     window.open(cometUrl, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+
+                if (action === 'delete') {
+                    const id = parsePositiveInteger(actionBtn.dataset.trainingId);
+                    const name = decodeDataValue(actionBtn.dataset.trainingName);
+                    if (id == null) {
+                        showAlert(messageSlot, '训练日志 ID 无效。', 'error');
+                        return;
+                    }
+                    const confirmed = window.confirm(`确认删除训练日志“${name || `#${id}`}”吗？`);
+                    if (!confirmed) return;
+
+                    try {
+                        await apiRequest(`/training-results/${id}`, { method: 'DELETE' });
+                        if (state.editingId === id) {
+                            resetTrainingLogForm();
+                        }
+                        showAlert(messageSlot, `训练日志“${name || `#${id}`}”已删除。`, 'info');
+                        fetchTrainingLogs();
+                    } catch (error) {
+                        showAlert(messageSlot, `删除训练日志失败: ${error.message}`, 'error');
+                    }
                 }
             });
         }
 
-        fetchTrainingResults();
+        resetTrainingLogForm();
+        fetchTrainingLogs();
     }
 
     // Generic table features for non-model pages
@@ -3416,8 +5367,18 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable();
     }
 
+    // resolveInitialPage chooses the page restored after a full refresh.
+    const resolveInitialPage = () => {
+        const persistedPage = readPersistedCurrentPage();
+        if (isSupportedDashboardPage(persistedPage)) {
+            return persistedPage;
+        }
+        return 'model-management';
+    };
+
     // Initial Load
-    loadPage('model-management');
+    applyCurrentUserProfile();
+    loadPage(resolveInitialPage());
 
     // Handle Navigation
     navItems.forEach((item) => {
@@ -3425,8 +5386,6 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
 
             const page = item.getAttribute('data-page');
-            document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active'));
-            item.classList.add('active');
 
             if (page) {
                 loadPage(page);
@@ -3471,4 +5430,266 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // ==================== SRT Generation Page ====================
+    function initSRTGenerationPage() {
+        const table = document.querySelector('[data-srt-table]');
+        if (!table) return;
+
+        const tbody = table.querySelector('tbody');
+        const searchInput = document.querySelector('[data-srt-search-input]');
+        const searchBtn = document.querySelector('[data-srt-search-btn]');
+        const refreshBtn = document.querySelector('[data-srt-refresh-btn]');
+        const pageSizeSelect = document.querySelector('[data-srt-page-size]');
+        const totalItemsEl = document.querySelector('[data-srt-total-items]');
+        const paginationControls = document.querySelector('[data-srt-pagination]');
+        const messageSlot = document.querySelector('[data-srt-message]');
+
+        const state = {
+            page: 1,
+            pageSize: Number(pageSizeSelect && pageSizeSelect.value) || 10,
+            keyword: '',
+            total: 0,
+            rows: [],
+            loading: false,
+        };
+
+        let searchTimer = null;
+
+        const setLoadingState = (loading) => {
+            state.loading = loading;
+            [searchInput, searchBtn, refreshBtn, pageSizeSelect].forEach((el) => {
+                if (el) el.disabled = loading;
+            });
+        };
+
+        const renderPlaceholderRow = (message) => {
+            tbody.innerHTML = `<tr><td colspan="5" class="table-state">${escapeHtml(message)}</td></tr>`;
+        };
+
+        const renderSRTStatus = (video) => {
+            if (video.srt_completed) {
+                return '<span class="badge badge-success">已完成</span>';
+            }
+            if (video.srt_status === 'processing') {
+                return '<span class="badge badge-warning">处理中...</span>';
+            }
+            if (video.srt_status === 'failed') {
+                return '<span class="badge badge-error">失败</span>';
+            }
+            return '<span class="badge badge-muted">未生成</span>';
+        };
+
+        const renderSlotStatus = (video) => {
+            if (video.slot_filling_completed) {
+                return '<span class="badge badge-success">已完成</span>';
+            }
+            if (video.srt_completed && video.frame_capture_completed) {
+                return '<span class="badge badge-info">可填充</span>';
+            }
+            return '<span class="badge badge-muted">待满足条件</span>';
+        };
+
+        const renderRows = () => {
+            if (!Array.isArray(state.rows) || state.rows.length === 0) {
+                renderPlaceholderRow('暂无视频数据');
+                return;
+            }
+
+            tbody.innerHTML = state.rows.map((video) => {
+                const id = Number(video.id) || 0;
+                const title = escapeHtml(video.name || '--');
+                const originalFileName = escapeHtml(video.original_file_name || video.file_name || '--');
+                const durationText = escapeHtml(formatDuration(video.duration_seconds));
+                const srtStatus = renderSRTStatus(video);
+                const slotStatus = renderSlotStatus(video);
+                const canGenerateSRT = !video.srt_completed && video.srt_status !== 'processing';
+                const canFillSlots = video.srt_completed && video.frame_capture_completed && !video.slot_filling_completed;
+                const srtDownloadUrl = video.srt_download_url || '';
+                const slotDownloadUrl = video.slot_download_url || '';
+
+                return `
+                    <tr data-srt-row-id="${id}">
+                        <td>
+                            <div class="video-listing">
+                                <div class="video-copy">
+                                    <div class="video-name">${title}</div>
+                                    <div class="video-file-name">${originalFileName}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${durationText}</td>
+                        <td>${srtStatus}</td>
+                        <td>${slotStatus}</td>
+                        <td>
+                            <div class="video-row-actions">
+                                ${canGenerateSRT ? `<button class="btn btn-primary btn-sm" data-srt-action="generate" data-srt-id="${id}">
+                                    <i class="fa-solid fa-closed-captioning"></i> 生成SRT
+                                </button>` : ''}
+                                ${canFillSlots ? `<button class="btn btn-secondary btn-sm" data-srt-action="fill-slots" data-srt-id="${id}">
+                                    <i class="fa-solid fa-puzzle-piece"></i> 槽位填充
+                                </button>` : ''}
+                                ${srtDownloadUrl ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(srtDownloadUrl)}" download>
+                                    <i class="fa-solid fa-download"></i> SRT
+                                </a>` : ''}
+                                ${slotDownloadUrl ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(slotDownloadUrl)}" download>
+                                    <i class="fa-solid fa-download"></i> 槽位
+                                </a>` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        const renderPaginationControls = () => {
+            if (!paginationControls) return;
+            const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+            if (state.page > totalPages) state.page = totalPages;
+            paginationControls.innerHTML = '';
+
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+            prevBtn.disabled = state.page <= 1 || state.loading;
+            prevBtn.addEventListener('click', () => {
+                if (state.page <= 1) return;
+                state.page -= 1;
+                fetchSRTVideos();
+            });
+            paginationControls.appendChild(prevBtn);
+
+            let startPage = Math.max(1, state.page - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+
+            for (let i = startPage; i <= endPage; i += 1) {
+                const btn = document.createElement('button');
+                btn.textContent = String(i);
+                if (i === state.page) btn.classList.add('active');
+                btn.disabled = state.loading;
+                btn.addEventListener('click', () => {
+                    if (state.page === i) return;
+                    state.page = i;
+                    fetchSRTVideos();
+                });
+                paginationControls.appendChild(btn);
+            }
+
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+            nextBtn.disabled = state.page >= totalPages || state.loading;
+            nextBtn.addEventListener('click', () => {
+                if (state.page >= totalPages) return;
+                state.page += 1;
+                fetchSRTVideos();
+            });
+            paginationControls.appendChild(nextBtn);
+        };
+
+        async function fetchSRTVideos() {
+            setLoadingState(true);
+            renderPaginationControls();
+            renderPlaceholderRow('视频列表加载中...');
+            clearAlert(messageSlot);
+
+            try {
+                const data = await apiRequest('/videos', {
+                    query: {
+                        page: state.page,
+                        page_size: state.pageSize,
+                        keyword: state.keyword,
+                    },
+                });
+                const list = Array.isArray(data && data.list) ? data.list : [];
+                const total = Number(data && data.total);
+                state.rows = list;
+                state.total = Number.isFinite(total) ? total : list.length;
+                renderRows();
+                renderPaginationControls();
+                if (totalItemsEl) totalItemsEl.textContent = String(state.total);
+            } catch (error) {
+                state.rows = [];
+                state.total = 0;
+                renderPlaceholderRow('视频数据加载失败');
+                renderPaginationControls();
+                if (totalItemsEl) totalItemsEl.textContent = '0';
+                showAlert(messageSlot, `加载视频失败: ${error.message}`, 'error');
+            } finally {
+                setLoadingState(false);
+                renderPaginationControls();
+            }
+        }
+
+        const applySearch = () => {
+            state.keyword = String(searchInput && searchInput.value || '').trim();
+            state.page = 1;
+            fetchSRTVideos();
+        };
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', applySearch);
+        }
+        if (searchInput) {
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') applySearch();
+            });
+        }
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                fetchSRTVideos();
+            });
+        }
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', () => {
+                state.pageSize = Number(pageSizeSelect.value) || 10;
+                state.page = 1;
+                fetchSRTVideos();
+            });
+        }
+
+        // Delegate click events for SRT actions
+        document.addEventListener('click', async (e) => {
+            const generateBtn = e.target.closest('[data-srt-action="generate"]');
+            if (generateBtn) {
+                const videoId = generateBtn.getAttribute('data-srt-id');
+                if (!videoId) return;
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 生成中...';
+                try {
+                    await apiRequest(`/videos/${videoId}/srt/generate`, { method: 'POST' });
+                    showAlert(messageSlot, 'SRT 生成成功！', 'success');
+                } catch (error) {
+                    showAlert(messageSlot, `SRT 生成失败: ${error.message}`, 'error');
+                } finally {
+                    fetchSRTVideos();
+                }
+                return;
+            }
+
+            const fillSlotsBtn = e.target.closest('[data-srt-action="fill-slots"]');
+            if (fillSlotsBtn) {
+                const videoId = fillSlotsBtn.getAttribute('data-srt-id');
+                if (!videoId) return;
+                fillSlotsBtn.disabled = true;
+                fillSlotsBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 填充中...';
+                try {
+                    const result = await apiRequest(`/videos/${videoId}/srt/fill-slots`, {
+                        method: 'POST',
+                        body: JSON.stringify({}),
+                    });
+                    const filledCount = result && result.slot_count ? result.slot_count : 0;
+                    showAlert(messageSlot, `槽位填充成功！共匹配 ${filledCount} 张图片`, 'success');
+                } catch (error) {
+                    showAlert(messageSlot, `槽位填充失败: ${error.message}`, 'error');
+                } finally {
+                    fetchSRTVideos();
+                }
+                return;
+            }
+        });
+
+        fetchSRTVideos();
+    }
 });

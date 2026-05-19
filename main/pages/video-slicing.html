@@ -1,0 +1,188 @@
+<header class="page-header">
+    <h1>视频切片</h1>
+    <p class="subtitle">导入、预览并管理待处理视频资源</p>
+</header>
+
+<div class="content-body">
+    <div class="info-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>当前版本支持视频导入、封面预览、在线播放，以及按固定整数秒间隔抽帧；每隔 x 秒生成一张图片，x 必须是大于等于 1 的整数。</span>
+    </div>
+
+    <div class="card list-card">
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2>视频列表</h2>
+                <p class="model-subtitle">上传后会自动生成封面图，并将视频元信息写入 MySQL，支持关键字检索与分页预览。</p>
+            </div>
+            <div class="actions model-actions">
+                <div class="search-bar model-search-bar">
+                    <input type="text" placeholder="搜索视频名称或原始文件名..." data-video-search-input>
+                    <button class="btn btn-secondary" data-video-search-btn>
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+                <button class="btn btn-primary" data-video-upload-open>
+                    <i class="fa-solid fa-file-video"></i>
+                    导入视频
+                </button>
+                <button class="btn btn-secondary" data-video-refresh-btn>
+                    <i class="fa-solid fa-sync"></i>
+                    刷新
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="video-message-slot" data-video-message></div>
+            <table class="data-table" data-video-table>
+                <thead>
+                    <tr>
+                        <th>视频</th>
+                        <th>时长</th>
+                        <th>大小</th>
+                        <th>导入时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="table-state">视频列表加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span>共 <span data-video-total-items>0</span> 条记录</span>
+                    <div>
+                        每页显示:
+                        <select class="page-size-select" data-video-page-size>
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pagination-controls" data-video-pagination></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" data-video-upload-modal hidden>
+    <div class="modal-card model-import-card">
+        <div class="modal-header">
+            <h3>导入视频</h3>
+            <button class="btn-icon" type="button" data-video-upload-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="form-divider"></div>
+        <form data-video-upload-form>
+            <div
+                class="upload-area small model-upload-dropzone"
+                data-video-file-dropzone
+                role="button"
+                tabindex="0"
+                aria-label="拖拽或点击选择视频文件"
+            >
+                <input
+                    type="file"
+                    data-video-file-input
+                    accept="video/mp4,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/webm"
+                    hidden
+                />
+                <i class="fa-solid fa-photo-film"></i>
+                <p>拖拽视频到这里，或点击选择文件</p>
+                <span class="hint" data-video-file-hint>支持 mp4 / mov / mkv / avi / mpeg / webm</span>
+            </div>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="video-name">视频名称 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="video-name" name="name" class="form-control" type="text" required />
+                </div>
+                <div class="form-group">
+                    <label for="video-file-name">原始文件名</label>
+                    <input id="video-file-name" class="form-control" type="text" readonly />
+                </div>
+                <div class="form-group form-span-2">
+                    <label for="video-description">描述（可选）</label>
+                    <textarea id="video-description" name="description" class="form-control model-textarea" rows="3" placeholder="可填写拍摄场景、来源、目标抽帧策略等"></textarea>
+                </div>
+            </div>
+            <div class="model-import-feedback" data-video-upload-feedback hidden></div>
+            <div class="form-actions modal-actions">
+                <button class="btn btn-secondary" type="button" data-video-upload-close>取消</button>
+                <button class="btn btn-primary" type="submit" data-video-upload-submit>
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    提交导入
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-overlay" data-video-preview-modal hidden>
+    <div class="modal-card video-preview-card">
+        <div class="modal-header">
+            <h3 data-video-preview-title>视频预览</h3>
+            <button class="btn-icon" type="button" data-video-preview-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="form-divider"></div>
+        <div class="video-preview-body">
+            <video controls playsinline preload="metadata" data-video-preview-player></video>
+            <p class="video-preview-meta" data-video-preview-meta></p>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" data-video-slice-modal hidden>
+    <div class="modal-card video-slice-card">
+        <div class="modal-header">
+            <h3 data-video-slice-title>固定间隔抽帧</h3>
+            <button class="btn-icon" type="button" data-video-slice-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="form-divider"></div>
+        <form data-video-slice-form>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="video-slice-duration">抽帧间隔（秒） <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="video-slice-duration" name="interval_seconds" class="form-control" type="number" min="1" step="1" inputmode="numeric" required />
+                </div>
+                <div class="form-group">
+                    <label for="video-slice-hint">约束说明</label>
+                    <input id="video-slice-hint" class="form-control" type="text" value="仅支持大于等于 1 秒的整数，不支持小数" readonly />
+                </div>
+            </div>
+            <div class="model-import-feedback" data-video-slice-feedback hidden></div>
+            <div class="form-actions modal-actions">
+                <button class="btn btn-secondary" type="button" data-video-slice-close>取消</button>
+                <button class="btn btn-primary" type="submit" data-video-slice-submit>
+                    <i class="fa-solid fa-camera-retro"></i>
+                    开始抽帧
+                </button>
+            </div>
+        </form>
+        <div class="video-frame-collections" data-video-frame-collections hidden>
+            <div class="video-slice-results-header">
+                <div>
+                    <h4>已有抽帧结果</h4>
+                    <p data-video-frame-collections-meta></p>
+                </div>
+            </div>
+            <div class="video-frame-collections-list" data-video-frame-collections-list></div>
+        </div>
+        <div class="video-slice-results" data-video-slice-results hidden>
+            <div class="video-slice-results-header">
+                <div>
+                    <h4>抽帧结果</h4>
+                    <p data-video-slice-results-meta></p>
+                </div>
+            </div>
+            <div class="video-slice-result-list" data-video-slice-result-list></div>
+        </div>
+    </div>
+</div>

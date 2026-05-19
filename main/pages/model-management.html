@@ -6,7 +6,7 @@
 <div class="content-body">
     <div class="info-box">
         <i class="fa-solid fa-circle-info"></i>
-        <span>支持检测、分割、分类等多种任务模型，对接 Lucky Project v1 API，并兼容本地存储与百度网盘存储标记。</span>
+        <span>支持检测、分割、分类等多种任务模型；模型同步仅支持本地与百度网盘之间双向同步。</span>
     </div>
 
     <div class="card list-card">
@@ -127,6 +127,7 @@
                         name="storage_server"
                         class="form-control"
                         data-storage-server-select
+                        data-storage-server-scope="model"
                         required
                     >
                         <option value="">加载中...</option>
@@ -149,17 +150,6 @@
                 <div class="form-group">
                     <label for="model-size-mb">模型大小 (MB) <span class="required-mark" aria-hidden="true">*</span></label>
                     <input id="model-size-mb" name="size_mb" class="form-control" type="number" min="0.01" step="0.01" required />
-                </div>
-                <div class="form-group form-span-2">
-                    <label for="model-path">模型路径（上传后自动生成）</label>
-                    <input
-                        id="model-path"
-                        name="model_path"
-                        class="form-control"
-                        type="text"
-                        placeholder="上传完成后自动回填保存路径"
-                        readonly
-                    />
                 </div>
                 <div class="form-group form-span-2">
                     <label for="model-description">描述（可选）</label>

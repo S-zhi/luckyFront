@@ -3,21 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>本地 AI 模型管理与推理平台</title>
+    <title>Luckey Studio | 主控台</title>
+    <script src="auth-session.js"></script>
+    <script>
+        window.LP_AUTH && window.LP_AUTH.requireSession();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../auth/css/logo.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <div class="glass-background"></div>
+    <div class="ambient-grid"></div>
     <div class="app-container">
         <!-- 左侧导航栏 -->
         <aside class="sidebar glass-sidebar">
             <div class="logo-area">
-                <i class="fa-solid fa-cube"></i>
-                <span>AI Core Platform</span>
+                <div class="logo-shell">
+                    <button id="lucky-logo" class="button" data-text="Luckey Studio" type="button" aria-label="Luckey Studio">
+                        <span id="Lucky-Studio-actual-text" class="actual-text">Luckey Studio</span>
+                        <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">Luckey Studio</span>
+                    </button>
+                    <small class="logo-kicker">LOCAL AI WORKSPACE</small>
+                </div>
             </div>
             <nav class="nav-menu">
                 <!-- 模型与数据管理 Group -->
@@ -34,9 +45,6 @@
                         <a href="#" class="nav-item sub-item" data-page="dataset-management">
                             <span>数据集管理</span>
                         </a>
-                        <a href="#" class="nav-item sub-item" data-page="training-results">
-                            <span>训练结果管理</span>
-                        </a>
                     </div>
                 </div>
 
@@ -48,14 +56,40 @@
                         <i class="fa-solid fa-chevron-down arrow"></i>
                     </div>
                     <div class="submenu" style="display: block;">
-                        <a href="#" class="nav-item sub-item" data-page="model-training">
-                            <span>模型训练</span>
-                        </a>
                         <a href="#" class="nav-item sub-item" data-page="model-validation">
-                            <span>模型验证</span>
+                            <span>模型训练日志</span>
                         </a>
                         <a href="#" class="nav-item sub-item" data-page="model-inference">
                             <span>模型推理</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-item has-submenu">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>个性化配置</span>
+                        <i class="fa-solid fa-chevron-down arrow"></i>
+                    </div>
+                    <div class="submenu" style="display: block;">
+                        <a href="#" class="nav-item sub-item" data-page="baidu-netdisk-binding">
+                            <span>百度网盘绑定</span>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="nav-group">
+                    <div class="nav-item has-submenu">
+                        <i class="fa-solid fa-film"></i>
+                        <span>视频处理</span>
+                        <i class="fa-solid fa-chevron-down arrow"></i>
+                    </div>
+                    <div class="submenu" style="display: block;">
+                        <a href="#" class="nav-item sub-item" data-page="video-slicing">
+                            <span>视频切片</span>
+                        </a>
+                        <a href="#" class="nav-item sub-item" data-page="srt-generation">
+                            <span>SRT生成</span>
                         </a>
                     </div>
                 </div>
@@ -66,8 +100,12 @@
                 </a>
             </nav>
             <div class="user-info">
-                <div class="avatar">Admin</div>
-                <div class="role">Researcher</div>
+                <div class="avatar" data-current-user-avatar>A</div>
+                <div class="user-copy">
+                    <div class="name" data-current-user-name>Administrator</div>
+                    <div class="user-email" data-current-user-email>admin@luckey.studio</div>
+                </div>
+                <div class="status-pill" data-current-user-status>Admin</div>
             </div>
         </aside>
 
@@ -80,7 +118,8 @@
         </main>
     </div>
 
-    <script src="config.js"></script>
-    <script src="app.js" defer></script>
+    <script charset="UTF-8" src="config.js"></script>
+    <script charset="UTF-8" src="../auth/js/logo.js" defer></script>
+    <script charset="UTF-8" src="app.js" defer></script>
 </body>
 </html>

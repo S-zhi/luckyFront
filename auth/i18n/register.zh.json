@@ -11,8 +11,8 @@
       "为你的工作空间创建安全账户",
       "桌面端与移动端都保持顺滑"
     ],
-    "statValue": "3 分钟",
-    "statLabel": "平均完成时间"
+    "statValue": "检测中",
+    "statLabel": "当前请求端环境"
   },
   "form": {
     "heading": "创建账户",

@@ -1,101 +1,243 @@
 <header class="page-header">
     <h1>模型推理</h1>
-    <p class="subtitle">配置参数并执行模型推理任务</p>
+    <p class="subtitle">接入 Docker 或远程推理服务，完成 healthz 探活并执行真实图片推理</p>
 </header>
 
-<div class="content-body">
-    <div class="grid-layout">
-        <!-- 左列：配置与输入 -->
-        <div class="grid-col left-col">
-            <div class="card">
-                <div class="card-header">
-                    <h2><i class="fa-solid fa-sliders"></i> 推理配置</h2>
+<div class="content-body inference-stack-layout">
+    <div class="card">
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2><i class="fa-solid fa-floppy-disk"></i> 推理配置</h2>
+                <p class="model-subtitle">保存当前接入方式、服务地址与推理参数，后续可直接加载复用。</p>
+            </div>
+            <div class="actions model-actions">
+                <div class="search-bar model-search-bar">
+                    <input type="text" placeholder="搜索配置名称或服务地址..." data-inference-config-search-input>
+                    <button class="btn btn-secondary" type="button" data-inference-config-search-btn>
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
                 </div>
-                <div class="card-body">
-                    <form class="inference-form">
-                        <div class="form-group">
-                            <label>选择模型版本</label>
-                            <select class="form-control">
-                                <option>yolo_v8_n.pt (v1.0)</option>
-                                <option>bert_base_uncased.onnx (v2.1)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>推理方式</label>
-                            <div class="radio-group">
-                                <label class="radio-label"><input type="radio" name="mode" checked> 单次推理</label>
-                                <label class="radio-label"><input type="radio" name="mode"> 批量推理</label>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>置信度阈值 (Confidence)</label>
-                            <input type="range" class="range-input" min="0" max="1" step="0.1" value="0.5">
-                            <div class="range-value">0.5</div>
-                        </div>
-                        
-                        <div class="form-divider"></div>
+                <button class="btn btn-primary" type="button" data-inference-config-save-open>
+                    <i class="fa-solid fa-floppy-disk"></i> 保存当前配置
+                </button>
+                <button class="btn btn-secondary" type="button" data-inference-config-refresh-btn>
+                    <i class="fa-solid fa-sync"></i> 刷新
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="inline-status" data-inference-config-status></div>
+            <table class="data-table" data-inference-config-table>
+                <thead>
+                    <tr>
+                        <th>配置名称</th>
+                        <th>接入方式</th>
+                        <th>服务地址</th>
+                        <th>推理参数</th>
+                        <th>更新时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="6" class="table-state">推理配置加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="table-footer-inline">
+                <span>共 <span data-inference-config-total>0</span> 条配置</span>
+                <span data-inference-config-active-label>当前未加载保存配置</span>
+            </div>
+        </div>
+    </div>
 
-                        <div class="form-group">
-                            <label>上传数据集 / 图片</label>
-                            <div class="upload-area small" id="dataset-upload">
-                                <i class="fa-solid fa-file-arrow-up"></i>
-                                <span>点击上传待推理数据</span>
-                            </div>
-                            <!-- 数据集大小警告 -->
-                            <div class="warning-box" style="display:block; margin-top: 10px;">
-                                <i class="fa-solid fa-triangle-exclamation"></i>
-                                <span>当前文件大小: 25MB (阈值: 50MB) - <span class="text-success">允许上传</span></span>
-                                <!-- 超过阈值时显示：提示使用 SCP -->
-                            </div>
-                        </div>
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fa-solid fa-plug"></i> 服务接入</h2>
+        </div>
+        <div class="card-body">
+            <form class="inference-form" data-inference-connect-form>
+                <div class="form-group">
+                    <label>接入方式</label>
+                    <div class="radio-group">
+                        <label class="radio-label"><input type="radio" name="access_type" value="docker" checked> Docker</label>
+                        <label class="radio-label"><input type="radio" name="access_type" value="remote"> 远程服务</label>
+                    </div>
+                </div>
 
-                        <div class="form-actions">
-                            <button type="button" class="btn btn-primary full-width">
-                                <i class="fa-solid fa-play"></i> 启动推理服务
-                            </button>
+                <div class="form-group">
+                    <label for="inference-base-url">服务地址</label>
+                    <input id="inference-base-url" name="base_url" class="form-control" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000">
+                </div>
+
+                <div class="form-group" data-inference-docker-group>
+                    <label for="inference-docker-command">Docker 启动命令</label>
+                    <textarea id="inference-docker-command" name="docker_command" class="form-control inference-textarea" placeholder="docker run -d -p 8000:8000 your-image"></textarea>
+                    <div class="form-help">Docker 模式下会先执行该命令，再通过 <code>/healthz</code> 检查服务是否可用。</div>
+                </div>
+
+                <div class="dual-field-row">
+                    <div class="form-group">
+                        <label for="inference-healthz-path">Healthz 路径</label>
+                        <input id="inference-healthz-path" name="healthz_path" class="form-control" value="/healthz">
+                    </div>
+                    <div class="form-group">
+                        <label for="inference-predict-path">Predict 路径</label>
+                        <input id="inference-predict-path" name="predict_path" class="form-control" value="/predict">
+                    </div>
+                </div>
+
+                <div class="dual-field-row">
+                    <div class="form-group">
+                        <label for="inference-startup-timeout">启动超时（秒）</label>
+                        <input id="inference-startup-timeout" name="startup_timeout_second" class="form-control" type="number" min="5" max="300" value="30">
+                    </div>
+                    <div class="form-group">
+                        <label>后端代理地址</label>
+                        <div class="readonly-inline" data-inference-api-base>--</div>
+                    </div>
+                </div>
+
+                <div class="form-actions split-actions">
+                    <button type="button" class="btn btn-secondary" data-inference-check-btn>
+                        <i class="fa-solid fa-heart-pulse"></i> 校验连接
+                    </button>
+                    <button type="button" class="btn btn-primary" data-inference-start-btn>
+                        <i class="fa-solid fa-play"></i> 启动并探活
+                    </button>
+                </div>
+
+                <div class="inline-status" data-inference-connect-status></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fa-solid fa-image"></i> 推理参数</h2>
+        </div>
+        <div class="card-body">
+            <form class="inference-form" data-inference-predict-form>
+                <div class="form-group">
+                    <label>上传待推理图片</label>
+                    <div class="upload-area small" data-inference-file-dropzone tabindex="0">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        <span data-inference-file-hint>点击上传待推理图片，或拖拽到这里</span>
+                    </div>
+                    <input type="file" accept="image/*" hidden data-inference-file-input>
+                </div>
+
+                <div class="triple-field-row">
+                    <div class="form-group">
+                        <label for="inference-conf">conf</label>
+                        <input id="inference-conf" name="conf" class="form-control" type="number" step="0.01" min="0" max="1" value="0.25">
+                    </div>
+                    <div class="form-group">
+                        <label for="inference-imgsz">imgsz</label>
+                        <input id="inference-imgsz" name="imgsz" class="form-control" type="number" min="32" value="640">
+                    </div>
+                    <div class="form-group">
+                        <label for="inference-classes">classes</label>
+                        <input id="inference-classes" name="classes" class="form-control" value="0,2" placeholder="0,2">
+                    </div>
+                </div>
+
+                <div class="form-help">请求会按你提供的接口格式转发：<code>multipart/form-data</code>，字段为 <code>file</code>、<code>conf</code>、<code>imgsz</code>、<code>classes</code>。</div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary full-width" data-inference-run-btn>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 执行真实推理
+                    </button>
+                </div>
+
+                <div class="inline-status" data-inference-predict-status></div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card result-card inference-result-card">
+        <div class="card-header">
+            <h2>推理结果展示</h2>
+            <span class="badge secondary" data-inference-result-badge>未连接</span>
+        </div>
+        <div class="card-body result-container">
+            <div class="result-placeholder" data-inference-placeholder>
+                <p>请先上传图片并执行推理，结果会直接绘制在图片上。</p>
+            </div>
+
+            <div class="inference-output" data-inference-output hidden>
+                <div class="result-preview-panel">
+                    <div class="result-preview-card">
+                        <div class="section-title">识别结果预览</div>
+                        <div class="inference-preview-stage">
+                            <img alt="推理输入图片预览" data-inference-preview-image>
+                            <canvas data-inference-preview-canvas></canvas>
                         </div>
-                    </form>
+                    </div>
+                    <div class="result-preview-card">
+                        <div class="section-title">接口摘要</div>
+                        <div class="kv-list">
+                            <div><span>服务地址</span><strong data-inference-result-base-url>--</strong></div>
+                            <div><span>Healthz</span><strong data-inference-result-healthz-url>--</strong></div>
+                            <div><span>Predict</span><strong data-inference-result-predict-url>--</strong></div>
+                            <div><span>结果数量</span><strong data-inference-result-count>0</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-table-panel">
+                    <div class="section-title">结构化结果</div>
+                    <div class="table-shell">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>class_id</th>
+                                    <th>class_name</th>
+                                    <th>confidence</th>
+                                    <th>bbox_xyxy</th>
+                                </tr>
+                            </thead>
+                            <tbody data-inference-result-tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="output-item">
+                    <div class="label">Raw JSON</div>
+                    <pre class="code-block" data-inference-raw-json>[]</pre>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- 右列：结果展示 -->
-        <div class="grid-col right-col">
-            <div class="card result-card">
-                <div class="card-header">
-                    <h2>推理结果展示</h2>
-                    <span class="badge processing">运行中...</span>
+<div class="modal-overlay" data-inference-config-modal hidden>
+    <div class="modal-card model-import-card">
+        <div class="modal-header">
+            <h3 data-inference-config-modal-title>保存推理配置</h3>
+            <button class="btn-icon" type="button" data-inference-config-modal-close title="关闭">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="form-divider"></div>
+        <form data-inference-config-modal-form>
+            <div class="form-grid-2">
+                <div class="form-group">
+                    <label for="inference-config-name">配置名称 <span class="required-mark" aria-hidden="true">*</span></label>
+                    <input id="inference-config-name" name="name" class="form-control" type="text" required />
                 </div>
-                <div class="card-body result-container">
-                    <!-- 模拟结果 -->
-                    <div class="result-placeholder">
-                        <div class="loader"></div>
-                        <p>正在推理中，请稍候...</p>
-                    </div>
-                    
-                    <!-- 实际结果展示区 (Hidden by default for demo) -->
-                    <div class="inference-output" style="display:none;">
-                        <div class="output-item">
-                            <div class="label">LabelText Output:</div>
-                            <div class="code-block">
-                                {
-                                  "class": "person",
-                                  "confidence": 0.98,
-                                  "bbox": [102, 50, 300, 400]
-                                }
-                            </div>
-                        </div>
-                        
-                        <div class="validation-section">
-                            <div class="section-title">校验结果</div>
-                            <div class="alert info">
-                                <i class="fa-solid fa-shield-halved"></i> 校验服务：结果在预期范围内 (Pass)
-                            </div>
-                        </div>
-                    </div>
-
+                <div class="form-group">
+                    <label for="inference-config-description">配置描述</label>
+                    <input id="inference-config-description" name="description" class="form-control" type="text" placeholder="例如：Docker 本地检测服务" />
                 </div>
             </div>
-        </div>
+            <div class="model-import-feedback" data-inference-config-modal-feedback hidden></div>
+            <div class="form-actions modal-actions">
+                <button class="btn btn-secondary" type="button" data-inference-config-modal-close>取消</button>
+                <button class="btn btn-primary" type="submit" data-inference-config-modal-submit>
+                    <i class="fa-solid fa-floppy-disk"></i> 保存配置
+                </button>
+            </div>
+        </form>
     </div>
 </div>

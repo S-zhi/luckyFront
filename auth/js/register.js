@@ -7,6 +7,7 @@ const configuredBaseUrl =
 const apiBaseUrl = (configuredBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
 const timeoutMs =
   Number(window.APP_CONFIG && window.APP_CONFIG.API_TIMEOUT_MS) || 15000;
+const redirectDelayMs = 1200;
 
 const form = document.querySelector("[data-register-form]");
 const statusEl = document.querySelector("[data-status]");
@@ -54,6 +55,13 @@ const requestRegister = async (payload) => {
   } finally {
     window.clearTimeout(timeoutId);
   }
+};
+
+// redirectToLogin navigates the user to the sign-in page after registration succeeds.
+const redirectToLogin = () => {
+  window.setTimeout(() => {
+    window.location.href = "login_page.html";
+  }, redirectDelayMs);
 };
 
 const validatePasswordMatch = () => {
@@ -134,6 +142,7 @@ if (form) {
             t("messages.success", "Registration successful."),
           "success"
         );
+        redirectToLogin();
         return;
       }
 

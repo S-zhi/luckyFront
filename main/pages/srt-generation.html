@@ -1,0 +1,65 @@
+<header class="page-header">
+    <h1>SRT生成</h1>
+    <p class="subtitle">从视频提取语音，生成SRT字幕，并执行槽位填充将字幕与抽帧图片关联</p>
+</header>
+
+<div class="content-body">
+    <div class="info-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>操作流程：先完成"视频切片"页面的抽帧 → 点击"生成SRT" → 等待字幕生成完成 → 点击"槽位填充"将字幕匹配到抽帧图片。</span>
+    </div>
+
+    <div class="card list-card">
+        <div class="card-header model-card-header">
+            <div class="model-title-block">
+                <h2>视频列表</h2>
+                <p class="model-subtitle">选择视频进行SRT字幕生成和槽位填充操作。</p>
+            </div>
+            <div class="actions model-actions">
+                <div class="search-bar model-search-bar">
+                    <input type="text" placeholder="搜索视频名称或原始文件名..." data-srt-search-input>
+                    <button class="btn btn-secondary" data-srt-search-btn>
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+                <button class="btn btn-secondary" data-srt-refresh-btn>
+                    <i class="fa-solid fa-sync"></i>
+                    刷新
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="video-message-slot" data-srt-message></div>
+            <table class="data-table" data-srt-table>
+                <thead>
+                    <tr>
+                        <th>视频</th>
+                        <th>时长</th>
+                        <th>SRT状态</th>
+                        <th>槽位填充</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="table-state">视频列表加载中...</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="pagination-container">
+                <div class="pagination-info">
+                    <span>共 <span data-srt-total-items>0</span> 条记录</span>
+                    <div>
+                        每页显示:
+                        <select class="page-size-select" data-srt-page-size>
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pagination-controls" data-srt-pagination></div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -11,8 +11,8 @@
       "Secure account creation for your workspace",
       "Fast, stable experience on desktop and mobile"
     ],
-    "statValue": "3 min",
-    "statLabel": "average setup time"
+    "statValue": "detecting",
+    "statLabel": "request client environment"
   },
   "form": {
     "heading": "Create account",

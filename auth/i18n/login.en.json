@@ -11,8 +11,8 @@
       "Clear field states with low-noise feedback",
       "Direct access to your workspace"
     ],
-    "statValue": "live",
-    "statLabel": "workspace access"
+    "statValue": "detecting",
+    "statLabel": "request client environment"
   },
   "form": {
     "heading": "Sign in",

@@ -1,0 +1,95 @@
+<header class="page-header">
+    <h1>百度网盘绑定</h1>
+    <p class="subtitle">直接提交百度 OAuth 返回的 Access Token 凭证，由后端 BFF 统一接管</p>
+</header>
+
+<div class="content-body">
+    <div class="info-box">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>
+            本页不再收集 <code>client_id</code>、<code>client_secret</code>、<code>redirect_uri</code>，只负责把百度 OAuth 已返回的 Access Token 凭证提交给后端。
+        </span>
+    </div>
+
+    <div class="grid-layout">
+        <div class="card">
+            <div class="card-header">
+                <h2>如何获取凭证</h2>
+            </div>
+            <div class="card-body">
+                <ol style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.8;">
+                    <li>按百度网盘 OAuth 文档完成授权流程，拿到百度 OAuth 服务器返回的 Access Token 凭证。</li>
+                    <li>如果你拿到的是完整 JSON 响应，可整段粘贴到本页。</li>
+                    <li>如果你只拿到了 <code>access_token</code> 字符串，也可以直接粘贴。</li>
+                    <li>提交后由后端 BFF 保存或接管该凭证，用于后续网盘访问。</li>
+                </ol>
+                <div class="form-actions" style="justify-content: flex-start; margin-top: 20px;">
+                    <a
+                        class="btn btn-secondary"
+                        href="https://pan.baidu.com/union/doc/6l0ryrjzv"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <i class="fa-solid fa-book-open"></i>
+                        查看官方文档
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>提交 Access Token 凭证</h2>
+            </div>
+            <div class="card-body">
+                <p class="model-subtitle">
+                    当前页面会向 <code data-baidu-bind-endpoint-label>/baidu/oauth/token</code> 发送 <code>POST</code> 请求。
+                </p>
+                <form data-baidu-bind-form>
+                    <div class="form-grid-2">
+                        <div class="form-group form-span-2">
+                            <label for="baidu-access-token-credential">Access Token 凭证 <span class="required-mark" aria-hidden="true">*</span></label>
+                            <textarea
+                                id="baidu-access-token-credential"
+                                name="credential"
+                                class="form-control model-textarea"
+                                rows="8"
+                                placeholder='可粘贴完整 JSON，例如 {"access_token":"...","refresh_token":"...","expires_in":2592000}，也可直接粘贴 access_token'
+                                required
+                            ></textarea>
+                        </div>
+                    </div>
+                    <div class="model-import-feedback" data-baidu-bind-feedback hidden></div>
+                    <div class="form-actions modal-actions">
+                        <button class="btn btn-primary" type="submit" data-baidu-bind-submit>
+                            <i class="fa-solid fa-link"></i>
+                            上传凭证
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="card list-card">
+        <div class="card-header">
+            <h2>返回结果</h2>
+        </div>
+        <div class="card-body">
+            <p class="model-subtitle">上传完成后不会刷新页面；如果后端返回当前配置目录及文件列表，会直接展示在这里。</p>
+            <div class="property-grid" data-baidu-bind-result-summary hidden></div>
+            <div data-baidu-bind-file-panel hidden style="margin-top: 16px;">
+                <h3 style="margin: 0 0 10px; font-size: 15px; color: var(--text-main);">当前目录文件</h3>
+                <ul data-baidu-bind-file-list style="margin: 0; padding-left: 20px; color: var(--text-secondary); line-height: 1.8;"></ul>
+            </div>
+            <details style="margin-top: 16px;">
+                <summary>查看原始返回</summary>
+                <pre
+                    class="property-json-block"
+                    data-baidu-bind-result
+                    style="min-height: 220px; margin: 12px 0 0;"
+                >等待提交凭证...</pre>
+            </details>
+        </div>
+    </div>
+</div>

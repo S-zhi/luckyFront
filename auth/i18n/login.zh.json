@@ -4,15 +4,15 @@
   },
   "brand": {
     "name": "Lucky Studio",
-    "headline": "回到控制室",
+    "headline": "模型工程",
     "tagline": "这是一个更安静、更聚焦的模型、数据与算力工作界面。登录后继续你的流程与协作。",
     "highlights": [
       "黑色极简界面，聚焦核心操作",
       "字段状态清晰，反馈克制直接",
       "进入你的专属工作空间"
     ],
-    "statValue": "在线",
-    "statLabel": "工作空间访问"
+    "statValue": "检测中",
+    "statLabel": "当前请求端环境"
   },
   "form": {
     "heading": "登录",

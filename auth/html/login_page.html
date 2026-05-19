@@ -12,9 +12,9 @@
   <script src="../js/input_view_change.js" defer></script>
   <script src="../js/logo.js" defer></script>
   <script src="../../main/config.js" defer></script>
+  <script src="../../main/auth-session.js" defer></script>
   <script src="../js/i18n.js" defer></script>
   <script src="../js/login.js" defer></script>
-  <script src="../js/machine_info.js" defer></script>
 </head>
 
 <body>
@@ -24,9 +24,9 @@
       <main class="card">
         <section class="brand">
           <!-- Lucky Studio Logo -->
-          <button id="lucky-logo" class="button" data-text="Awesome">
-            <span id="Lucky-Studio-actual-text" class="actual-text">&nbsp;LuckyStudio&nbsp;</span>
-            <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">&nbsp;LuckyStudio&nbsp;</span>
+          <button id="lucky-logo" class="button" data-text="Luckey Studio">
+            <span id="Lucky-Studio-actual-text" class="actual-text">Luckey Studio</span>
+            <span id="Lucky-Studio-hover-text" aria-hidden="true" class="hover-text">Luckey Studio</span>
           </button>
           <!-- Lucky Studio Branding : Lucky Studio-->
           <p class="eyebrow" data-i18n="brand.name"></p>
@@ -37,11 +37,6 @@
             <li data-i18n="brand.highlights.1"></li>
             <li data-i18n="brand.highlights.2"></li>
           </ul>
-          <div class="stat">
-            <span class="stat-value" id="stat-value"></span>
-            <span class="stat-label" data-i18n="brand.statLabel">
-            </span>
-          </div>
         </section>
         <section class="panel">
           <div class="panel-header">
